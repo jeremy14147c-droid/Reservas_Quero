@@ -2,7 +2,7 @@
 
 ## 1. Cuentas
 - **GitHub** (repositorio privado, ya lo vas a crear).
-- Para el proyecto final: cuenta gratuita de **Expo** y un proyecto de **Firebase** (no los necesitas ahora).
+- Para el proyecto final (opcional): una cuenta con un proveedor de la API de WhatsApp, solo si deciden recibir reservas por ahí. No la necesitas ahora.
 
 ## 2. Instalaciones (Windows)
 | Qué | Verificación |
@@ -11,7 +11,6 @@
 | **Python 3.11 o superior** (marca "Add Python to PATH") | `python --version` |
 | **PostgreSQL 16** (el instalador trae pgAdmin) | `psql --version` (si no la reconoce, usa la ruta completa, ej. `"C:\Program Files\PostgreSQL\16\bin\psql.exe"`) |
 | **Antigravity** | Abre una carpeta sin errores |
-| **Node.js LTS** (solo para el proyecto final) | `node --version` |
 
 Anota la contraseña del usuario `postgres` que elijas al instalar PostgreSQL.
 
@@ -62,18 +61,12 @@ BASE_URL=http://localhost:5000
 Si la clave tiene caracteres especiales (`@`, `:`, `/`), hay que codificarlos en la URL. Más fácil: usa una clave solo con letras y números.
 
 ## 6. Datos que debes pedirle a la dueña (antes de la Fase 2)
-Aforo, número de mesas, personas por mesa, duración de una estadía, horario, tolerancia, días de anticipación para reservar,
-la carta con precios, y el número y titular de su Yape. El `seed.sql` trae valores de ejemplo.
+Aforo, número de mesas, personas por mesa, duración de una estadía, horario, tolerancia, tiempo máximo de preparación en cocina, días de anticipación para reservar,
+la carta con precios, y el número y titular de su Yape. También la marca, el modelo, la conexión y el ancho de papel de su tiquetera (ver `GUIA_IMPRESION.md`).
+El `seed.sql` trae valores de ejemplo.
 
-## 7. Para el proyecto final (no ahora)
-```
-npx create-expo-app@latest quero-staff
-cd quero-staff
-npx expo start
-```
-- Escaneas el QR con la app **Expo Go** para ver la interfaz.
-- **Las notificaciones push NO funcionan en Expo Go desde el SDK 53:** necesitas una *development build* (EAS Build, con cuenta de Expo) y un **celular real** (no emulador). En Android 13 o superior, además, la app debe pedir permiso de notificaciones.
-- Verifica las versiones cuando llegue el momento: Expo cambia seguido.
+## 7. Impresión de tickets
+Lee `GUIA_IMPRESION.md` antes de la Fase 4 y averigua con la dueña los datos de su tiquetera. El sistema es solo web: no hay app que instalar.
 
 ## 8. Base de datos gratuita en la nube (si la necesitas) y migración
 Tu código solo usa `DATABASE_URL`: cambiar de proveedor es cambiar esa línea y mover los datos.

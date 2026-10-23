@@ -10,12 +10,16 @@ Debe estar **funcionando en ~1 semana**. El equipo (4 estudiantes) tiene que pod
 parte del código en una sustentación**: prioriza código simple, legible y comentado en español.
 Nada de abstracciones innecesarias ni patrones complejos.
 
+**Alcance de la plataforma:** sistema **solo web** (adaptable a celular, tablet y computador, e instalable como PWA).
+**No habrá app móvil nativa**: los requerimientos del APF se reescribieron como sistema web y la profesora lo aprobó.
+Los tres roles usan la misma web desde cualquier dispositivo con navegador:
+- **cliente:** páginas públicas (QR, reservar, pedir, seguimiento), sin cuenta;
+- **empleado** y **admin:** panel con login. La web del staff funciona en cualquier equipo (si un celular se queda sin batería, se entra desde otro).
+
 **Etapas:**
-1. **Primer avance (1 semana):** web con Flask que ya incluye los 3 roles: cliente (público, sin cuenta), empleado y admin.
-2. **Proyecto final:** la web del cliente se mantiene; el empleado y el admin usarán además una **app** (React Native con Expo)
-   que consumirá la API JSON de este mismo servidor. La web del staff NO es provisional: se conserva como respaldo sin instalación
-   (por ejemplo, si un celular se queda sin batería, se entra desde cualquier otro dispositivo con el navegador).
-Por eso el MVP se construye **preparado para la app** (ver sección 4b).
+1. **Primer avance (1 semana):** Fases 0 a 4 de `PROMPTS_POR_FASE.md`.
+2. **Proyecto final:** el mismo sistema + notificaciones (correo y WhatsApp en un toque), impresión automática en la tiquetera y,
+   opcional, recepción de reservas por WhatsApp.
 
 ## 2. Principios no negociables
 1. **El staff decide.** Ninguna reserva ni pedido remoto reduce capacidad, entra a cocina ni cambia de
@@ -51,7 +55,7 @@ quero/
 │   ├── carta/               # gestión de platos (staff)
 │   ├── admin/               # config del local y personal
 │   ├── servicios/           # lógica de negocio (reglas, transiciones, cálculos), SIN depender de Flask
-│   ├── api/                 # rutas JSON /api/v1/... (las usan los tableros web y, en el proyecto final, la app)
+│   ├── api/                 # rutas JSON /api/v1/... (las usan los tableros de la propia web y, en el final, el agente de impresión)
 │   ├── notificaciones/      # (proyecto final) correo, enlaces de WhatsApp, plantillas de mensajes
 │   ├── templates/  static/
 │   └── utils.py             # normalizar teléfono, generar códigos, formateo
@@ -59,18 +63,19 @@ quero/
 └── manage.py                # comandos: init-db, cargar-ejemplo, crear-admin
 ```
 
-## 4b. Preparación para la app futura (obligatoria desde la Fase 0)
+## 4b. Servicios y API interna (obligatorio desde la Fase 0)
 1. **La lógica de negocio vive en `app/servicios/`**: funciones que reciben datos y devuelven resultados o lanzan errores de negocio.
    Las rutas y las plantillas solo llaman a los servicios; nunca contienen reglas.
 2. **Los datos de los tableros** (pizarra de reservas, cola de pedidos, cocina) salen de rutas JSON bajo `/api/v1/`
    (ej. `/api/v1/reservas/dia?fecha=2026-10-20`). Las páginas web las consumen con `fetch` para refrescarse solas:
-   así la API se prueba todos los días y la app podrá usarla tal cual.
+   así esa API interna se prueba todos los días.
 3. **Formato JSON uniforme:** éxito `{"ok": true, "datos": ...}`; error `{"ok": false, "error": {"codigo": "...", "mensaje": "..."}}`
    con el código HTTP correcto. Fechas en ISO 8601.
-4. **La identidad del usuario se obtiene SOLO con `obtener_usuario_actual()`.** Hoy lee la sesión; en el proyecto final también leerá un
-   token. El decorador de roles usa esa función, nunca la sesión directamente.
+4. **La identidad del usuario se obtiene SOLO con `obtener_usuario_actual()`** (lee la sesión de Flask-Login). El decorador de roles usa esa función,
+   nunca la sesión directamente.
 5. **Las respuestas de la API nunca incluyen** `password_hash` ni datos de clientes que el usuario no deba ver.
-6. (Opcional, Fase 4) `manifest.webmanifest` e iconos para poder instalar la web en el celular.
+6. **Instalable (Fase 4):** `manifest.webmanifest`, iconos y un service worker mínimo que NO guarda datos en caché (solo cumple con la instalación).
+   Toda pantalla operativa pide siempre datos frescos al servidor.
 
 ## 5. Variables de entorno (`.env`, nunca se sube; subir solo `.env.example` con valores falsos)
 `DATABASE_URL`, `SECRET_KEY`, `BASE_URL` (para los QR), `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
@@ -107,7 +112,7 @@ quero/
 - Dos tipos: `local` (cliente presente, lo registra el staff; `cliente_id` puede ir vacío) y `recojo` (lo pide el cliente por la web; exige cliente).
 - Estados: `pendiente` → `aceptado` | `rechazado` | `cancelado`; `aceptado` → `en_preparacion` | `cancelado`;
   `en_preparacion` → `listo` | `cancelado`; `listo` → `entregado`. Centralizar las transiciones en UNA función
-  (`transicion_pedido`) que rechace las inválidas y llene `aceptado_en`, `listo_en`, `entregado_en`.
+  (`transicion_pedido`) que rechace las inválidas y llene `aceptado_en`, `preparacion_en`, `listo_en`, `entregado_en`.
 - **Pedido `recojo`:** el staff revisa disponibilidad ANTES de cobrar. Puede quitar o ajustar líneas mientras está `pendiente`.
   Al aceptar, el monto queda fijo (el detalle ya no se edita). Rechazar exige `motivo_rechazo`.
 - **Pago:** se registra en la tabla `pago` (monto, medio, referencia). Lo confirma SIEMPRE el staff, mirando el Yape/Plin real.
@@ -117,10 +122,13 @@ quero/
 - `precio_venta` se copia del `precio` del plato al crear la línea. No se puede pedir un plato con `disponible = FALSE` o `activo = FALSE`.
 - El cliente sigue su pedido en `/pedido/<token>` (UUID, no el id). Esa página muestra estado, total, y las instrucciones de pago
   (datos Yape de `config_local`) cuando está `aceptado` y por cobrar.
+- **Cocina:** cada pedido en preparación muestra el tiempo transcurrido desde `preparacion_en`. Si supera `umbral_preparacion_min` de `config_local`,
+  se resalta en rojo (solo visual; no cambia su estado).
 
 ## 9. Contacto (MVP) y notificaciones (proyecto final)
-> **En el MVP solo se implementa el menú ⋮ de contacto** (enlaces `wa.me`, `tel:` y `mailto:`, que no necesitan ninguna API).
-> El correo automático, el modal de WhatsApp y el uso de la tabla `notificacion` son del **proyecto final**: NO implementarlos todavía.
+> **En el MVP se implementa:** el menú ⋮ de contacto (enlaces `wa.me`, `tel:` y `mailto:`, sin ninguna API) y las **alertas dentro del panel**
+> (insignia con el número de solicitudes nuevas y aviso sonoro opcional; ver sección 11).
+> El correo automático, el modal de WhatsApp, el uso de la tabla `notificacion` y las notificaciones push son del **proyecto final**: NO implementarlos todavía.
 > El resto de esta sección queda como especificación para esa etapa.
 - **Menú ⋮ en cada fila** de reservas y pedidos: WhatsApp (enlace `https://wa.me/51<9 dígitos>?text=<mensaje codificado>`),
   Llamar (`tel:+51...`), Correo (`mailto:`, solo si hay correo), Ver detalle, Imprimir ticket, y Cambiar hora (reservas).
@@ -137,7 +145,16 @@ quero/
 - Pedido: número, nombre (si hay), tipo, platos × cantidad con notas, total y estado de cobro.
 - Un **QR** con la dirección interna (`BASE_URL/staff/reserva/<id>` o `/staff/pedido/<id>`): lo escanea el staff con la cámara del celular
   y abre el detalle (pide login si hace falta) con los botones de acción.
-- CSS `@media print` con ancho configurable (80 mm por defecto; variable CSS para cambiar a 58 mm). Impresión con `window.print()`; botón "Reimprimir".
+- CSS `@media print` con ancho configurable (80 mm por defecto; variable CSS para cambiar a 58 mm), sin márgenes ni encabezados del navegador.
+
+**Estrategia de impresión por niveles:**
+1. **Nivel 1 (MVP): impresión manual** con `window.print()`: botones "Imprimir" y "Reimprimir".
+2. **Nivel 2 (MVP; es configuración del equipo de la tiquetera, no código):** ese equipo abre Chrome o Edge con el parámetro `--kiosk-printing`
+   y la tiquetera como impresora predeterminada; así `window.print()` imprime sin cuadro de confirmación (ver `GUIA_IMPRESION.md`).
+   En la app: una casilla activable "Imprimir al pasar a cocina" que abre el ticket y llama a `window.print()`. Debe estar apagada por defecto.
+3. **Nivel 3 (proyecto final): impresión automática desde el servidor** mediante un agente local en el equipo de la tiquetera. NO implementar ahora.
+- El servidor NO puede imprimir directo en la tiquetera si está alojado en internet: no alcanza la red del local.
+- Página `/staff/imprimir/prueba` con un ticket de prueba para calibrar ancho y márgenes.
 
 ## 11. Interfaz
 - Español de Perú, moneda **S/**, fechas `dd/mm/aaaa`, horas en formato 12 h con am/pm, zona `America/Lima`.
@@ -146,6 +163,12 @@ quero/
   antes se marcan "continúa"), y una fila final con personas, mesas, libres y cuál limita (`fn_carga_dia`). Las solicitudes
   `pendiente` van en un panel aparte, no en las columnas.
 - Los tableros se refrescan solos cada ~10 s con `fetch` (sin WebSockets).
+- **Cocina (estilo Kanban):** tarjetas por pedido con temporizador; resaltado en rojo al superar `umbral_preparacion_min`; botón "Listo".
+- **Alertas en el panel:** insignia con las solicitudes o pedidos nuevos y un sonido OPCIONAL. Los navegadores exigen un toque del usuario antes de
+  reproducir audio, así que debe haber un botón "Activar sonido". Sonar solo cuando aparece algo nuevo respecto a la consulta anterior.
+- **Pantalla de cocina:** pedir que la pantalla no se apague (Screen Wake Lock API) cuando el navegador lo permita.
+- **Sin conexión no se opera. No hay modo offline.** Si falla la conexión (evento `offline` o error de `fetch`), mostrar el banner "Sin conexión: no se puede operar"
+  y deshabilitar los botones de acción (atributo `data-requiere-conexion`). Al volver la red, quitar el banner y refrescar. No guardar borradores locales.
 
 ## 12. Seguridad (obligatorio)
 Consultas SIEMPRE parametrizadas · CSRF en todos los formularios · contraseñas con hash · autoescape de Jinja activo ·
@@ -153,8 +176,8 @@ validar todo en el servidor · tokens UUID en URLs públicas · formularios púb
 
 ## 13. Fuera de alcance del MVP (no implementar)
 Ingresos y egresos, trabajadores y sueldos, delivery, reportes, lista de espera walk-in por QR, tabla de mesas físicas,
-bitácora, pagos automáticos con Yape/Plin, notificaciones automáticas (correo, WhatsApp por API, push), cuentas de cliente,
-app móvil (es del proyecto final; en el MVP solo se deja lista la API, secc. 4b).
+bitácora, pagos automáticos con Yape/Plin, notificaciones automáticas (correo, WhatsApp por API, push), impresión automática desde el servidor,
+recepción de reservas por WhatsApp, modo sin conexión, cuentas de cliente y app móvil (descartada).
 
 ## 14. Forma de trabajar
 1. Antes de programar cada fase: presenta un plan de implementación y espera aprobación.
