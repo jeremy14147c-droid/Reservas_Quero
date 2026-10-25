@@ -24,6 +24,7 @@ Los tres roles usan la misma web desde cualquier dispositivo con navegador:
 ## 2. Principios no negociables
 1. **El staff decide.** Ninguna reserva ni pedido remoto reduce capacidad, entra a cocina ni cambia de
    estado sin una acción explícita del personal. Las alertas son solo visuales; nada se libera ni se cancela solo.
+   **El staff nunca queda bloqueado por el cupo ni por la tolerancia:** la app avisa, el staff decide.
 2. **Cambiar lo mínimo los procesos del local.** La dueña hoy usa una pizarra, WhatsApp y tickets de una
    tiquetera. El sistema se adapta a eso.
 3. **Lo calculado no se guarda** (totales, cupos, saldo): sale de vistas/funciones SQL o de consultas.
@@ -98,12 +99,32 @@ quero/
   Mesas requeridas = personas / `personas_por_mesa`, redondeado hacia arriba (un grupo de 2 usa una mesa entera).
   Usar las funciones `fn_carga_dia` y `fn_hay_cupo` de `schema.sql`; no reimplementar esa lógica en Python.
 - `porcentaje_reservable` limita cuánto del local pueden ocupar las reservas (el resto queda para walk-in). NULL = 100 %.
-- Al confirmar o crear una reserva sin cupo: mostrar advertencia clara; el staff puede **forzar** con una confirmación explícita.
-- **Cambiar hora:** botón de dos toques. Misma reserva y mismo código; guardar la hora previa en `hora_anterior`;
-  validar con `fn_hay_cupo(..., p_excluir_reserva => id)`; advertir pero permitir forzar.
-- **Tolerancia:** si una reserva sigue `confirmada` pasada `hora + tolerancia_min`, resaltarla en rojo. No cambiar su estado sola.
+- **Cupo: la web bloquea, el staff solo recibe alertas.** En la web pública, `fn_hay_cupo` es un filtro duro (el cliente no ve el salón). Para el staff nunca bloquea:
+  al confirmar o crear una reserva, o al cambiar su hora, si no hay cupo se muestra una advertencia clara y el staff puede **forzar** con una confirmación explícita;
+  al forzar se guarda `reserva.excede_cupo = TRUE` (así se sabe después qué se forzó). Lo mismo si confirma una solicitud que vino de la web y ya no cabe.
+- **Alertas de ocupación:** `fn_carga_dia` devuelve la columna `nivel` por franja: `ok`, `alerta` (ocupación ≥ `umbral_alerta_pct` de `config_local`, "a punto de superar")
+  o `excedido` (se superó el límite de personas o de mesas). Usar ese valor para colorear (alerta en amarillo, excedido en rojo); no recalcularlo en Python.
+  Los libres pueden salir negativos: mostrarlos en rojo, sin ocultarlos. Los **pedidos no se limitan** por aforo ni mesas.
+- **Cambiar hora:** botón de dos toques. Misma reserva y mismo código; guardar la hora previa en `hora_anterior` (solo guarda el último cambio);
+  validar con `fn_hay_cupo(..., p_excluir_reserva => id)`; advertir pero permitir forzar (y marcar `excede_cupo` si se fuerza).
+  **Se permite aunque ya haya pasado la tolerancia**, mientras la reserva siga `confirmada`.
+- **Tolerancia:** si una reserva sigue `confirmada` pasada `hora + tolerancia_min`, resaltarla en rojo. Es solo una alerta: no cambia su estado sola ni impide ninguna acción.
+  El staff decide, desde esa misma tarjeta: **liberar** (marcar `no_llego`, que libera el cupo) o **cambiar la hora** si el cliente avisa que quiere otra.
+  `no_llego` es final: si el cliente aparece después, el staff crea una reserva nueva (el índice único ignora las `no_llego`).
 - Validaciones públicas: fecha entre hoy y hoy + `dias_max_anticipacion`; hora dentro del horario; personas ≥ 1 y ≤ aforo;
-  teléfono de 9 dígitos que empiece en 9; consentimiento de datos obligatorio.
+  teléfono de 9 dígitos que empiece en 9 (obligatorio); correo opcional; consentimiento de datos obligatorio.
+  **No se pide documento de identidad (DNI, CE ni pasaporte):** es un dato personal sin uso en el MVP.
+- **Identidad del cliente:** el teléfono es la llave (única). El correo NO es único; nunca fusionar fichas de clientes automáticamente. Sin cuenta, sin contraseña, sin login de cliente.
+- **No se verifica el contacto con códigos (ni SMS ni correo).** Decisión del equipo: el teléfono es obligatorio y el correo es opcional.
+  Un número ajeno no le sirve a quien lo escribe: los pedidos de recojo no entran a cocina ni se imprimen hasta que el staff los acepta y confirma el pago real,
+  y las reservas web nacen `pendiente` (no reducen capacidad) hasta que el staff las confirma. Antes de confirmar una reserva web, el staff puede escribir al cliente
+  por WhatsApp (menú ⋮) para comprobar que el número es suyo.
+- **Si el teléfono ya existe**, reutilizar la ficha del cliente y NO sobrescribir su nombre ni su correo con lo que llegó en el formulario.
+- **Tope de reservas web por teléfono:** una reserva pedida por la web se rechaza con un mensaje claro si ese cliente ya tiene `max_reservas_web_por_telefono`
+  (de `config_local`, por defecto 2) reservas web activas creadas en las últimas 24 h (`v_cliente_actividad_24h.reservas_web_24h`). El staff no tiene tope.
+  Es el único bloqueo por actividad; para los pedidos solo hay aviso.
+- **Actividad repetida:** `v_cliente_actividad_24h` (pedidos y reservas de las últimas 24 h, sin contar rechazados ni cancelados). Si el cliente de una solicitud web ya tiene
+  actividad reciente, mostrar al staff una insignia "ya pidió hace menos de 24 h" en esa solicitud. Es solo un aviso: no bloquea ni rechaza nada (el staff decide).
 - Al cliente nunca se le muestran números de capacidad. Solo un semáforo por hora: *disponible / pocas mesas / lleno*
   (usar la constante `PORC_POCAS = 25` de `config.py` como valor de ejemplo ajustable).
 - Un cliente no puede tener dos reservas activas a la misma fecha y hora (ya lo garantiza un índice único; mostrar el error en claro).
@@ -160,7 +181,7 @@ quero/
 - Español de Perú, moneda **S/**, fechas `dd/mm/aaaa`, horas en formato 12 h con am/pm, zona `America/Lima`.
 - Mobile-first: las pantallas del staff se usan en celular o tablet. Botones grandes, pocas acciones por pantalla.
 - Pizarra digital del día (reservas): columnas por franja horaria con las reservas que ocupan esa franja (las que continúan desde
-  antes se marcan "continúa"), y una fila final con personas, mesas, libres y cuál limita (`fn_carga_dia`). Las solicitudes
+  antes se marcan "continúa"), y una fila final con personas, mesas, libres y cuál limita (`fn_carga_dia`), coloreada según `nivel` (alerta / excedido). Las reservas con `excede_cupo` llevan una marca visible. Las solicitudes
   `pendiente` van en un panel aparte, no en las columnas.
 - Los tableros se refrescan solos cada ~10 s con `fetch` (sin WebSockets).
 - **Cocina (estilo Kanban):** tarjetas por pedido con temporizador; resaltado en rojo al superar `umbral_preparacion_min`; botón "Listo".
@@ -176,7 +197,7 @@ validar todo en el servidor · tokens UUID en URLs públicas · formularios púb
 
 ## 13. Fuera de alcance del MVP (no implementar)
 Ingresos y egresos, trabajadores y sueldos, delivery, reportes, lista de espera walk-in por QR, tabla de mesas físicas,
-bitácora, pagos automáticos con Yape/Plin, notificaciones automáticas (correo, WhatsApp por API, push), impresión automática desde el servidor,
+bitácora, pagos automáticos con Yape/Plin, notificaciones automáticas (correo, WhatsApp por API, push), verificación del contacto por código (SMS o correo), impresión automática desde el servidor,
 recepción de reservas por WhatsApp, modo sin conexión, cuentas de cliente y app móvil (descartada).
 
 ## 14. Forma de trabajar

@@ -2,7 +2,7 @@
 
 ## Antes de empezar (una sola vez)
 1. Haz primero los **pasos previos** de `PASOS_PREVIOS.md` (instalaciones, base de datos, `.env`).
-2. Copia a la raíz del repo: `AGENTS.md`, `schema.sql`, `seed.sql` (y deja `GUIA_IMPRESION.md` a mano para la Fase 4).
+2. Copia a la raíz del repo: `AGENTS.md`, `schema.sql` (la versión nueva), `seed.sql` (revisa que no inserte la columna `documento`, que ya no existe) (y deja `GUIA_IMPRESION.md` a mano para la Fase 4).
 3. Abre la carpeta en Antigravity. Usa el modo **Planning** en cada fase y **revisa el plan antes de aprobarlo**.
 4. Pega UN prompt por vez. No pases a la siguiente fase hasta probar la anterior y hacer commit.
 5. Si el agente propone cambiar el esquema o agregar paquetes, no lo aceptes sin discutirlo en el equipo.
@@ -68,7 +68,7 @@ Haz:
    El interruptor llama a una ruta JSON (POST /api/v1/platos/<id>/disponible) y actualiza la fila sin recargar la página.
    La regla vive en app/servicios/. Solo el admin crea, edita y desactiva platos y categorías. Nunca borrar un plato: desactivarlo.
 3. /admin/config (solo admin): formulario para editar config_local con todas las validaciones del esquema
-   (aforo, mesas, personas por mesa, duración de estadía, franja, tolerancia, umbral de preparación de cocina, horario, días de anticipación,
+   (aforo, mesas, personas por mesa, duración de estadía, franja, tolerancia, umbral de preparación de cocina, umbral de alerta de ocupación (%), máximo de reservas web por teléfono en 24 h, horario, días de anticipación,
    porcentaje reservable, datos de Yape). Mostrar ayuda breve en cada campo.
 4. /admin/personal (solo admin): listar, crear (con contraseña inicial y debe_cambiar_clave en TRUE), desactivar y reactivar cuentas,
    y restablecer contraseña. Un admin no puede desactivarse a sí mismo.
@@ -89,26 +89,36 @@ Objetivo: reservas completas, desde la solicitud del cliente hasta la pizarra di
 Haz:
 1. Formulario público /reservar: nombre, teléfono (9 dígitos), correo opcional, fecha, hora, personas, nota, consentimiento de datos.
    La hora se elige entre las franjas del horario del local, con semáforo (disponible / pocas mesas / lleno) calculado con fn_hay_cupo.
-   Nunca mostrar números de capacidad al cliente. Reutilizar al cliente si el teléfono ya existe. Al enviar, crear la reserva en estado
-   'pendiente', con código único generado por la app, y mostrar /reserva/<token> con su estado (se refresca sola).
+   Nunca mostrar números de capacidad al cliente. En la web el cupo SÍ bloquea: una hora llena no se puede enviar. No pedir documento de identidad.
+   Teléfono obligatorio y correo opcional; sin códigos de verificación. Reutilizar al cliente si el teléfono ya existe, sin sobrescribir su nombre ni su correo.
+   Si ese teléfono ya tiene max_reservas_web_por_telefono reservas web activas en las últimas 24 h (v_cliente_actividad_24h.reservas_web_24h), rechazar con un mensaje claro.
+   Si no, crear la reserva en estado 'pendiente', con código único generado por la app, y mostrar /reserva/<token> con su estado (se refresca sola).
 2. Pizarra digital /staff/reservas con selector de día (hoy por defecto):
    - Los datos salen de GET /api/v1/reservas/dia?fecha=... (JSON con formato de AGENTS.md 4b). La página los pide con fetch cada ~10 s y se repinta.
    - Columnas por franja horaria con las reservas que ocupan esa franja; las que continúan desde antes se marcan "continúa".
-   - Fila final por franja con personas, mesas, libres y cuál limita (usa fn_carga_dia; no reimplementes ese cálculo).
-   - Panel aparte de "Solicitudes pendientes" (no cuentan para la capacidad).
+   - Fila final por franja con personas, mesas, libres y cuál limita (usa fn_carga_dia; no reimplementes ese cálculo). Coloréala con la columna `nivel`:
+     alerta (amarillo) y excedido (rojo); los libres negativos se muestran en rojo. Las reservas con excede_cupo = TRUE llevan una marca visible.
+   - Panel aparte de "Solicitudes pendientes" (no cuentan para la capacidad). Si el cliente ya tiene actividad en las últimas 24 h (v_cliente_actividad_24h),
+     la solicitud muestra una insignia de aviso.
    - Cada tarjeta: botones "Llegó" y "No vino", y menú ⋮ (WhatsApp, Llamar, Correo si hay, Ver detalle, Cambiar hora, Imprimir ticket).
-   - Resaltar en rojo las reservas confirmadas que pasaron hora + tolerancia. No cambiar su estado solas.
+   - Resaltar en rojo las reservas confirmadas que pasaron hora + tolerancia. No cambiar su estado solas ni bloquear nada: desde esa tarjeta el staff puede
+     liberarla ("No vino") o cambiar su hora.
 3. Alertas en el panel (AGENTS.md sección 11): insignia con el número de solicitudes pendientes nuevas y un sonido OPCIONAL con un botón
    "Activar sonido". Sonar solo cuando aparece una solicitud nueva respecto a la consulta anterior.
 4. Acciones del staff: confirmar, rechazar (con motivo) y cancelar solicitudes; crear una reserva desde el staff (nace confirmada);
-   si no hay cupo, advertir y permitir forzar con confirmación explícita. Toda la lógica va en app/servicios/ y las rutas solo la llaman.
-5. Cambiar hora en dos toques: misma reserva y código, guarda hora_anterior, valida con fn_hay_cupo excluyendo la propia reserva, advierte pero permite forzar.
+   si no hay cupo, advertir y permitir forzar con confirmación explícita, guardando excede_cupo = TRUE (también al confirmar una solicitud web que ya no cabe).
+   El staff nunca queda bloqueado por el cupo. Toda la lógica va en app/servicios/ y las rutas solo la llaman.
+5. Cambiar hora en dos toques: misma reserva y código, guarda hora_anterior, valida con fn_hay_cupo excluyendo la propia reserva, advierte pero permite forzar
+   (marcando excede_cupo). Debe funcionar también cuando ya pasó la tolerancia, mientras la reserva siga confirmada.
 6. Ticket de reserva imprimible (AGENTS.md sección 10, nivel 1) con QR y la línea "ANTES → AHORA" cuando hubo cambio, y botón Reimprimir.
 7. Helper en utils.py para normalizar teléfonos y construir el enlace de WhatsApp (51 + 9 dígitos) con mensaje codificado (solo el enlace del menú ⋮).
-8. Pruebas con pytest: transiciones de estado de reserva, normalización de teléfono, enlace de WhatsApp y que la ruta JSON del día devuelva el formato esperado.
+8. Pruebas con pytest: transiciones de estado de reserva, normalización de teléfono, enlace de WhatsApp, que la ruta JSON del día devuelva el formato esperado
+   (incluida la columna nivel), que el staff pueda forzar una reserva sin cupo y quede con excede_cupo = TRUE, que la web NO pueda reservar una hora llena
+   que se pueda cambiar la hora de una reserva pasada de tolerancia, que la web rechace una reserva por encima del tope por teléfono y que el staff no tenga ese tope.
 
 Criterio de terminado: pido una reserva como cliente, aparece como pendiente con alerta; la confirmo como staff y se refleja en la fila de totales;
-la muevo de hora y el ticket muestra el cambio; una reserva que no cabe me avisa y puedo forzarla. Prueba todo en el navegador y reporta.
+la muevo de hora y el ticket muestra el cambio; una reserva que no cabe me avisa, puedo forzarla y queda marcada; una franja casi llena sale en amarillo y una excedida en rojo;
+una reserva pasada de tolerancia la puedo liberar o moverle la hora; desde la web no puedo reservar una hora llena; con el mismo teléfono la web me rechaza al pasar el tope de reservas en 24 h; el staff puede seguir registrando; una segunda solicitud del mismo cliente en menos de 24 h sale con aviso. Prueba todo en el navegador y reporta.
 Presenta el plan antes de programar.
 ```
 
@@ -121,12 +131,12 @@ Contexto: AGENTS.md (sobre todo secciones 4b, 8, 9, 10 y 11) y schema.sql. Fases
 Objetivo: pedidos de recojo desde la web y pedidos en local desde el staff, con aceptación, cobro manual, cocina y ticket.
 
 Haz:
-1. Formulario público /pedir: lista de platos disponibles por categoría con cantidades, nombre, teléfono, correo opcional, nota y consentimiento.
+1. Formulario público /pedir: lista de platos disponibles por categoría con cantidades, nombre, teléfono, correo opcional, nota y consentimiento (sin códigos de verificación).
    Crear un pedido tipo 'recojo' en estado 'pendiente' con precio_venta copiado de cada plato. Mostrar /pedido/<token>: estado, total y,
    cuando esté aceptado y por cobrar, las instrucciones de pago (datos de Yape de config_local). Se refresca solo.
 2. Cola del staff /staff/pedidos con columnas: Pendientes · Por cobrar · En cocina · Listos. Los datos salen de GET /api/v1/pedidos/cola
    (JSON con formato de AGENTS.md 4b) y la página los pide con fetch cada ~10 s. Cada fila con menú ⋮ (WhatsApp, Llamar, Correo, Ver detalle, Imprimir ticket).
-   Alertas en el panel: insignia y sonido opcional cuando aparece un pedido pendiente nuevo.
+   Alertas en el panel: insignia y sonido opcional cuando aparece un pedido pendiente nuevo, y la insignia "ya pidió hace menos de 24 h" (v_cliente_actividad_24h; solo aviso).
 3. Detalle /staff/pedido/<id> (a donde apunta el QR del ticket): botones según el estado.
    - Pendiente: ajustar o quitar líneas, ACEPTAR o RECHAZAR (motivo obligatorio). Al aceptar, el detalle queda fijo.
    - Aceptado y por cobrar: registrar pago (monto por defecto = total, medio, referencia). No permitir pagar de más.
@@ -159,7 +169,7 @@ Haz:
    Verifica que Chrome ofrezca instalar la web y que las pantallas operativas sigan pidiendo datos frescos.
 2. Impresión: página /staff/imprimir/prueba con un ticket de prueba para calibrar ancho (80 mm / 58 mm) y márgenes, sin encabezados del navegador. Añade al README una sección
    "Configurar la tiquetera" que resuma GUIA_IMPRESION.md.
-3. Comando manage.py cargar-demo con datos de demostración creíbles: reservas en varios horarios (incluida una que no cabe y una pasada de tolerancia)
+3. Comando manage.py cargar-demo con datos de demostración creíbles: reservas en varios horarios (incluida una forzada por el staff con excede_cupo, una franja en alerta y otra excedida, y una pasada de tolerancia)
    y pedidos en todos los estados (incluido uno que supere el umbral de cocina).
 4. Revisa que cada ruta de /staff, /admin y /api exija el rol correcto, que ninguna respuesta de la API incluya password_hash, mensajes de error en claro,
    estados vacíos y que todo se vea bien en celular.

@@ -61,9 +61,9 @@ BASE_URL=http://localhost:5000
 Si la clave tiene caracteres especiales (`@`, `:`, `/`), hay que codificarlos en la URL. Más fácil: usa una clave solo con letras y números.
 
 ## 6. Datos que debes pedirle a la dueña (antes de la Fase 2)
-Aforo, número de mesas, personas por mesa, duración de una estadía, horario, tolerancia, tiempo máximo de preparación en cocina, días de anticipación para reservar,
+Aforo, número de mesas, personas por mesa, duración de una estadía, horario, tolerancia, a partir de qué porcentaje de ocupación quieren la alerta (80 % por defecto), cuántas reservas web por teléfono permiten en 24 h (2 por defecto), tiempo máximo de preparación en cocina, días de anticipación para reservar,
 la carta con precios, y el número y titular de su Yape. También la marca, el modelo, la conexión y el ancho de papel de su tiquetera (ver `GUIA_IMPRESION.md`).
-El `seed.sql` trae valores de ejemplo.
+El `seed.sql` trae valores de ejemplo. Con el `schema.sql` nuevo, `seed.sql` no debe insertar la columna `documento` en `cliente` (se eliminó); `umbral_alerta_pct` tiene valor por defecto.
 
 ## 7. Impresión de tickets
 Lee `GUIA_IMPRESION.md` antes de la Fase 4 y averigua con la dueña los datos de su tiquetera. El sistema es solo web: no hay app que instalar.

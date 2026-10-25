@@ -1,9 +1,24 @@
 -- =====================================================================
--- Quero APP – Esquema PostgreSQL (MVP: reservas y pedidos)
+-- Quero APP – Esquema PostgreSQL v3 (MVP: reservas y pedidos)
 -- Fuente de verdad del modelo de datos. Se ejecuta de arriba a abajo
 -- (el orden respeta las llaves foráneas).
 -- Escalable: lo que no entra en el MVP (mesas físicas, ingresos y egresos,
--- trabajadores, bitácora) se agrega después SIN modificar estas tablas.
+-- trabajadores, bitácora, cuentas de cliente) se agrega después SIN
+-- modificar estas tablas.
+--
+-- CAMBIOS v3 respecto a v2:
+--  * config_local: nuevo max_reservas_web_por_telefono (tope de reservas web por teléfono en 24 h).
+--  * v_cliente_actividad_24h: pedidos y reservas recientes del cliente (se calcula, no se guarda).
+--  * El contacto NO se verifica con códigos: el teléfono es obligatorio y único, el correo es
+--    opcional. Los abusos se frenan con la aceptación del staff, el pago antes de cocinar y el tope.
+--
+-- CAMBIOS v2 respecto a v1:
+--  * cliente: se elimina "documento" (dato personal sin uso en el MVP).
+--             El teléfono sigue siendo la identidad (obligatorio, único).
+--  * config_local: nuevo umbral_alerta_pct (aviso "a punto de superar").
+--  * reserva: nuevo excede_cupo (el staff puede forzar; la web NO).
+--  * fn_carga_dia: devuelve la columna "nivel" (ok / alerta / excedido).
+--  * tolerancia: es solo una referencia para alertar; el staff decide.
 -- =====================================================================
 
 -- ---------- Personal (usuarios con login) ----------
@@ -29,8 +44,10 @@ CREATE TABLE config_local (
   personas_por_mesa      INT NOT NULL CHECK (personas_por_mesa > 0),
   duracion_estadia_min   INT NOT NULL CHECK (duracion_estadia_min > 0),
   franja_min             INT NOT NULL DEFAULT 30 CHECK (franja_min IN (15,30,60)),
-  tolerancia_min         INT NOT NULL CHECK (tolerancia_min >= 0),
+  tolerancia_min         INT NOT NULL CHECK (tolerancia_min >= 0),   -- solo referencia: pasado este tiempo la app ALERTA; el staff decide si libera o reprograma
   umbral_preparacion_min INT NOT NULL CHECK (umbral_preparacion_min > 0),   -- cocina: pasado este tiempo el pedido se resalta en rojo
+  max_reservas_web_por_telefono SMALLINT NOT NULL DEFAULT 2 CHECK (max_reservas_web_por_telefono >= 1), -- tope de reservas pedidas por la web con el mismo teléfono en 24 h (el staff no tiene tope)
+  umbral_alerta_pct      SMALLINT NOT NULL DEFAULT 80 CHECK (umbral_alerta_pct BETWEEN 1 AND 100), -- a partir de este % de ocupación la franja se marca "alerta"
   hora_apertura          TIME NOT NULL,
   hora_cierre            TIME NOT NULL,
   dias_max_anticipacion  INT NOT NULL CHECK (dias_max_anticipacion >= 0),
@@ -44,16 +61,20 @@ CREATE TABLE config_local (
 
 -- ---------- Cliente ----------
 -- Se identifica por teléfono (9 dígitos, Perú). Se reutiliza si vuelve a pedir/reservar.
+-- Sin cuenta ni contraseña (cliente "invitado"). El teléfono NO se verifica por código:
+-- el staff lo comprueba al escribirle por WhatsApp antes de confirmar.
+-- El correo es opcional y NO es único: una familia puede compartirlo, y fusionar fichas
+-- por un dato es peor que tener un duplicado.
 CREATE TABLE cliente (
   cliente_id       INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   nombre           VARCHAR(100) NOT NULL,
   telefono         VARCHAR(9)   NOT NULL UNIQUE CHECK (telefono ~ '^9[0-9]{8}$'),
   correo           VARCHAR(120) NULL,
-  documento        VARCHAR(20)  NULL,
   acepta_datos     BOOLEAN      NOT NULL CHECK (acepta_datos),     -- debe ser TRUE
   acepta_datos_en  TIMESTAMPTZ  NOT NULL DEFAULT now(),
   creado_en        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
+CREATE INDEX ix_cliente_correo ON cliente (lower(correo)) WHERE correo IS NOT NULL;
 
 -- ---------- Carta ----------
 CREATE TABLE categoria (
@@ -81,16 +102,19 @@ CREATE TABLE reserva (
   cliente_id         INT  NOT NULL REFERENCES cliente (cliente_id),
   fecha              DATE NOT NULL,
   hora               TIME NOT NULL,
-  hora_anterior      TIME NULL,                                          -- se llena al cambiar la hora
+  hora_anterior      TIME NULL,                                          -- se llena al cambiar la hora (guarda solo el último cambio)
   cantidad_personas  INT  NOT NULL CHECK (cantidad_personas > 0),
   estado             VARCHAR(12) NOT NULL DEFAULT 'pendiente'
                      CHECK (estado IN ('pendiente','confirmada','rechazada','cancelada','llego','no_llego')),
   canal              VARCHAR(5)  NOT NULL DEFAULT 'staff' CHECK (canal IN ('web','staff')),
+  excede_cupo        BOOLEAN NOT NULL DEFAULT FALSE,                     -- el staff confirmó/creó la reserva aun superando el cupo
   nota               VARCHAR(300) NULL,
   motivo             VARCHAR(200) NULL,                                  -- rechazo o cancelación
   creado_por         INT NULL REFERENCES personal (personal_id),         -- vacío si vino de la web
   creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
-  actualizado_en     TIMESTAMPTZ NOT NULL DEFAULT now()
+  actualizado_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- La web nunca fuerza cupo: solo el staff puede excederlo.
+  CONSTRAINT ck_reserva_forzar_solo_staff CHECK (NOT (excede_cupo AND canal = 'web' AND creado_por IS NULL AND estado = 'pendiente'))
 );
 CREATE INDEX ix_reserva_fecha_hora ON reserva (fecha, hora);
 -- Un cliente no puede tener dos reservas activas a la misma fecha y hora
@@ -99,6 +123,7 @@ CREATE UNIQUE INDEX ux_reserva_cliente_fecha_hora
   WHERE estado IN ('pendiente','confirmada','llego');
 
 -- ---------- Pedido ----------
+-- Los pedidos NO se limitan por aforo ni mesas.
 CREATE TABLE pedido (
   pedido_id        INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   token            UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),       -- seguimiento del cliente
@@ -177,17 +202,43 @@ LEFT JOIN (SELECT pedido_id, SUM(cantidad * precio_venta) AS total
 LEFT JOIN (SELECT pedido_id, SUM(monto) AS pagado
            FROM pago GROUP BY pedido_id) g ON g.pedido_id = p.pedido_id;
 
+-- Actividad reciente del cliente (últimas 24 h). Sirve para avisar al staff de pedidos o
+-- reservas repetidas. Los rechazados y cancelados no cuentan (un reintento legítimo no es abuso).
+CREATE VIEW v_cliente_actividad_24h AS
+SELECT c.cliente_id,
+       (SELECT count(*) FROM pedido p
+         WHERE p.cliente_id = c.cliente_id
+           AND p.estado NOT IN ('rechazado','cancelado')
+           AND p.creado_en > now() - interval '24 hours')  AS pedidos_24h,
+       (SELECT count(*) FROM reserva r
+         WHERE r.cliente_id = c.cliente_id
+           AND r.estado NOT IN ('rechazada','cancelada')
+           AND r.creado_en > now() - interval '24 hours')  AS reservas_24h,
+       (SELECT count(*) FROM reserva r
+         WHERE r.cliente_id = c.cliente_id
+           AND r.canal = 'web'
+           AND r.estado NOT IN ('rechazada','cancelada')
+           AND r.creado_en > now() - interval '24 hours')  AS reservas_web_24h   -- se compara con config_local.max_reservas_web_por_telefono
+FROM cliente c;
+
 -- Carga de reservas por franja para un día (pizarra digital).
--- Cuenta solo reservas 'confirmada' y 'llego' (las pendientes NO reducen capacidad).
+-- Cuenta solo reservas 'confirmada' y 'llego' (las pendientes NO reducen capacidad;
+-- 'no_llego', 'cancelada' y 'rechazada' liberan el cupo).
 -- Una reserva ocupa mesa durante toda su estadía, por eso aparece en cada franja que cubre.
 -- Mesas requeridas por reserva = personas / personas_por_mesa, redondeado hacia arriba.
+-- "nivel" alimenta las alertas del staff (el staff NO queda bloqueado):
+--   'ok'       = por debajo del umbral de alerta
+--   'alerta'   = ocupación >= umbral_alerta_pct (a punto de superar)
+--   'excedido' = se superó el límite de personas o de mesas (mostrar en rojo)
+-- personas_libres / mesas_libres pueden salir NEGATIVAS cuando hay exceso.
 CREATE OR REPLACE FUNCTION fn_carga_dia(p_fecha DATE, p_excluir_reserva INT DEFAULT NULL)
 RETURNS TABLE (
   franja_inicio TIME, franja_fin TIME,
   reservas INT, personas INT, mesas INT,
   limite_personas INT, limite_mesas INT,
   personas_libres INT, mesas_libres INT,
-  limita TEXT
+  limita TEXT,
+  nivel TEXT
 )
 LANGUAGE sql STABLE AS $$
   WITH c AS (SELECT * FROM config_local WHERE config_id = 1),
@@ -222,7 +273,12 @@ LANGUAGE sql STABLE AS $$
          lim.lp - k.personas,
          lim.lm - k.mesas,
          CASE WHEN (lim.lm - k.mesas) * c.personas_por_mesa < (lim.lp - k.personas)
-              THEN 'mesas' ELSE 'personas' END
+              THEN 'mesas' ELSE 'personas' END,
+         CASE WHEN k.personas > lim.lp OR k.mesas > lim.lm THEN 'excedido'
+              WHEN GREATEST(k.personas::numeric / NULLIF(lim.lp, 0),
+                            k.mesas::numeric    / NULLIF(lim.lm, 0)) * 100 >= c.umbral_alerta_pct
+              THEN 'alerta'
+              ELSE 'ok' END
   FROM carga k
   CROSS JOIN c
   CROSS JOIN LATERAL (
@@ -234,6 +290,9 @@ $$;
 
 -- ¿Cabe un grupo nuevo (o una reserva movida) en TODAS las franjas que ocuparía?
 -- Fuera del horario del local devuelve FALSE.
+-- USO: la WEB la usa como filtro duro (el cliente no ve el salón).
+--      El STAFF la usa solo para decidir si muestra la alerta y marca
+--      reserva.excede_cupo = TRUE cuando fuerza; nunca queda bloqueado.
 CREATE OR REPLACE FUNCTION fn_hay_cupo(p_fecha DATE, p_hora TIME, p_personas INT,
                                        p_excluir_reserva INT DEFAULT NULL)
 RETURNS BOOLEAN
