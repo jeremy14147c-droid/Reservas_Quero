@@ -74,13 +74,15 @@ def formato_fecha_ddmm(valor):
 # ---------- Enlaces de contacto del menú ⋮ (MVP: solo enlaces, sin API) ----------
 
 def enlace_whatsapp(telefono, mensaje):
-    """Construye el enlace https://wa.me/51XXXXXXXXX?text=... para escribir al cliente."""
+    """Construye el enlace https://wa.me/51XXXXXXXXX?text=... para escribir al cliente.
+    El mensaje se codifica para URL (los espacios van como %20)."""
+    from urllib.parse import quote
     tel = normalizar_telefono(telefono)
     if not tel:
         return None
     texto = str(mensaje or "").strip()
     if texto:
-        return f"https://wa.me/51{tel}?text={texto}"
+        return f"https://wa.me/51{tel}?text={quote(texto)}"
     return f"https://wa.me/51{tel}"
 
 
