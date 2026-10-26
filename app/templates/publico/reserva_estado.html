@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mi Reserva {{ reserva.codigo }} - {{ config.nombre_local }}{% endblock %}
+
+{% block estilos %}
+<style>
+    .estado-grande {
+        font-size: 1.4rem;
+        border-radius: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white text-center py-3">
+                <h4 class="fw-bold mb-0"><i class="bi bi-calendar-check me-2 text-warning"></i>Estado de mi reserva</h4>
+                <small class="text-white-50">Código: <strong>{{ reserva.codigo }}</strong></small>
+            </div>
+            <div class="card-body p-4 text-center">
+
+                <!-- Estado con color (solo visual para el cliente; el staff decide todo) -->
+                {% if reserva.estado == 'pendiente' %}
+                    <div class="alert estado-grande bg-warning-subtle border-warning mb-4 py-3">
+                        <i class="bi bi-hourglass-split display-6 d-block mb-2"></i>
+                        <strong>Pendiente de confirmación</strong>
+                        <p class="mb-0 small mt-1">El personal está revisando tu solicitud. Te escribirán para confirmar.</p>
+                    </div>
+                {% elif reserva.estado == 'confirmada' %}
+                    <div class="alert estado-grande bg-success-subtle border-success mb-4 py-3">
+                        <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
+                        <strong>¡Reserva confirmada!</strong>
+                        <p class="mb-0 small mt-1">Te esperamos. Si necesitas cambiar la hora, escríbenos por WhatsApp.</p>
+                    </div>
+                {% elif reserva.estado == 'rechazada' %}
+                    <div class="alert estado-grande bg-danger-subtle border-danger mb-4 py-3">
+                        <i class="bi bi-x-circle display-6 d-block mb-2"></i>
+                        <strong>Solicitud rechazada</strong>
+                        {% if reserva.motivo %}<p class="mb-0 small mt-1">Motivo: {{ reserva.motivo }}</p>{% endif %}
+                    </div>
+                {% elif reserva.estado == 'cancelada' %}
+                    <div class="alert estado-grande bg-secondary-subtle border-secondary mb-4 py-3">
+                        <i class="bi bi-slash-circle display-6 d-block mb-2"></i>
+                        <strong>Reserva cancelada</strong>
+                        {% if reserva.motivo %}<p class="mb-0 small mt-1">Motivo: {{ reserva.motivo }}</p>{% endif %}
+                    </div>
+                {% elif reserva.estado == 'no_llego' %}
+                    <div class="alert estado-grande bg-warning-subtle border-warning mb-4 py-3">
+                        <i class="bi bi-hourglass-bottom display-6 d-block mb-2"></i>
+                        <strong>Reserva liberada (no llegaste a tiempo)</strong>
+                        <p class="mb-0 small mt-1">Si deseas venir, llama o escríbenos y te registramos una reserva nueva.</p>
+                    </div>
+                {% elif reserva.estado == 'llego' %}
+                    <div class="alert estado-grande bg-success-subtle border-success mb-4 py-3">
+                        <i class="bi bi-emoji-smile display-6 d-block mb-2"></i>
+                        <strong>Ya estás en el local. ¡Buen provecho!</strong>
+                    </div>
+                {% endif %}
+
+                <!-- Datos de la reserva (solo lo que el cliente debe ver) -->
+                <ul class="list-group list-group-flush text-start">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><i class="bi bi-calendar3 me-2 text-muted"></i>Fecha</span>
+                        <strong>{{ utils_fecha(reserva.fecha) }}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><i class="bi bi-clock me-2 text-muted"></i>Hora</span>
+                        <strong>
+                            {% if reserva.hora_anterior %}
+                                {{ utils_hora12(reserva.hora) }}
+                                <span class="text-muted small m-1">(antes {{ utils_hora12(reserva.hora_anterior) }})</span>
+                            {% else %}
+                                {{ utils_hora12(reserva.hora) }}
+                            {% endif %}
+                        </strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><i class="bi bi-people me-2 text-muted"></i>Personas</span>
+                        <strong>{{ reserva.cantidad_personas }}</strong>
+                    </li>
+                    {% if reserva.nota %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span><i class="bi bi-chat-left-text me-2 text-muted"></i>Nota</span>
+                            <strong class="text-end">{{ reserva.nota }}</strong>
+                        </li>
+                    {% endif %}
+                </ul>
+
+                <p class="text-muted small mt-3 mb-0">
+                    Guarda este enlace para volver a revisar tu reserva.
+                    Esta página se actualiza sola.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // La página se refresca sola cada 15 s (datos siempre frescos, nada en caché).
+    setTimeout(function () { window.location.reload(); }, 15000);
+</script>
+{% endblock %}

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block titulo %}Reservar Mesa - {{ config.nombre_local }}{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">
+                <h4 class="fw-bold mb-0"><i class="bi bi-calendar-check me-2 text-warning"></i>Reservar una Mesa</h4>
+                <small class="text-white-50">{{ config.nombre_local }}</small>
+            </div>
+            <div class="card-body p-4">
+
+                {% if not config.abierto %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-clock-history me-1"></i> El local está cerrado por ahora. Puedes dejar tu
+                        solicitud y el personal la revisará cuando se abran las atenciones.
+                    </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('publico.reservar') }}"
+                      class="needs-validation" novalidate>
+
+                    <!-- Campo trampa (honeypot): invisible para personas -->
+                    <input type="text" name="pagina_web" id="pagina_web" class="d-none" tabindex="-1" autocomplete="off">
+
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label fw-semibold">Nombre de quien reserva *</label>
+                        <input type="text" class="form-control form-control-lg" id="nombre" name="nombre"
+                               maxlength="100" required
+                               value="{{ request.form.get('nombre', '') }}">
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="telefono" class="form-label fw-semibold">Teléfono (celular) *</label>
+                            <input type="tel" class="form-control" id="telefono" name="telefono"
+                                   inputmode="numeric" pattern="9[0-9]{8}" maxlength="9" required
+                                   placeholder="9 dígitos que empiece en 9"
+                                   value="{{ request.form.get('telefono', '') }}">
+                            <div class="form-text">Te contactaremos solo para confirmar tu reserva.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="correo" class="form-label fw-semibold">Correo (opcional)</label>
+                            <input type="email" class="form-control" id="correo" name="correo" maxlength="120"
+                                   value="{{ request.form.get('correo', '') }}">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="fecha" class="form-label fw-semibold">Fecha *</label>
+                            <select class="form-select" id="fecha" name="fecha" required
+                                    onchange="this.form.action='{{ url_for('publico.reservar') }}'; this.form.submit();">
+                                {% for f in fechas_permitidas %}
+                                    <option value="{{ f }}" {{ 'selected' if f == (request.form.get('fecha') or fecha_sel) else '' }}>{{ f }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Se puede reservar solo en fechas cercanas.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="personas" class="form-label fw-semibold">¿Cuántas personas? *</label>
+                            <input type="number" class="form-control" id="personas" name="personas" min="1"
+                                   max="{{ aforo }}" required value="{{ request.form.get('personas', '2') }}">
+                        </div>
+                    </div>
+
+                    <!-- Semáforo por hora: NUNCA se muestran números de capacidad -->
+                    <label class="form-label fw-semibold">Elige la hora *</label>
+                    <input type="hidden" name="hora" id="hora_seleccionada"
+                           value="{{ request.form.get('hora', '') }}" required>
+                    <div class="d-flex flex-wrap gap-2 mb-2" id="horas-container">
+                        {% for h in horarios %}
+                            {% if h.semaforo == 'lleno' %}
+                                <button type="button" class="btn btn-outline-secondary btn-opcion-hora disabled"
+                                        disabled title="Lleno: prueba otra hora">
+                                    <i class="bi bi-slash-circle me-1"></i> {{ h.hora }}
+                                </button>
+                            {% elif h.semaforo == 'pocas' %}
+                                <button type="button" class="btn btn-warning btn-opcion-hora"
+                                        data-hora="{{ h.hora }}" title="Quedan pocas mesas">
+                                    <i class="bi bi-exclamation-triangle me-1"></i> {{ h.hora }}
+                                </button>
+                            {% else %}
+                                <button type="button" class="btn btn-outline-success btn-opcion-hora"
+                                        data-hora="{{ h.hora }}" title="Disponible">
+                                    <i class="bi bi-check-circle me-1"></i> {{ h.hora }}
+                                </button>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="form-text mb-3">
+                        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Disponible</span>
+                        <span class="badge bg-warning text-dark">Quedan pocas mesas</span>
+                        <span class="badge bg-secondary">Lleno</span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="nota" class="form-label fw-semibold">Nota para el restaurante (opcional)</label>
+                        <textarea class="form-control" id="nota" name="nota" maxlength="300" rows="2"
+                                  placeholder="Ej. preferencia de zona, celebración, alergias...">{{ request.form.get('nota', '') }}</textarea>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="acepta_datos" name="acepta_datos" value="si" required>
+                        <label class="form-check-label small" for="acepta_datos">
+                            Autorizo el uso de mis datos únicamente para gestionar esta reserva.
+                            <span class="text-danger">*</span>
+                        </label>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-warning btn-lg fw-bold shadow-sm" data-requiere-conexion>
+                            <i class="bi bi-send me-1"></i> Enviar solicitud
+                        </button>
+                    </div>
+                    <p class="text-muted small text-center mt-3 mb-0">
+                        La solicitud queda <strong>pendiente</strong>: el personal la revisa y te confirmará.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Selección de hora: pinta la elegida y la guarda en el campo oculto.
+    document.querySelectorAll('.btn-opcion-hora:not([disabled])').forEach(function (boton) {
+        boton.addEventListener('click', function () {
+            document.querySelectorAll('.btn-opcion-hora').forEach(function (b) {
+                b.classList.remove('active', 'selected-hora');
+            });
+            boton.classList.add('active', 'selected-hora');
+            document.getElementById('hora_seleccionada').value = boton.dataset.hora;
+        });
+    });
+</script>
+{% endblock %}
