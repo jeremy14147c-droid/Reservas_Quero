@@ -3,16 +3,183 @@
 {% block titulo %}Configuración del Local - Admin{% endblock %}
 
 {% block contenido %}
-<div class="mb-4">
-    <h2 class="fw-bold mb-0"><i class="bi bi-sliders text-danger me-2"></i>Configuración del Local</h2>
-    <p class="text-muted small mb-0">Parámetros operativos (exclusivo para rol administrador)</p>
-</div>
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-10">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h2 class="fw-bold mb-0"><i class="bi bi-sliders text-danger me-2"></i>Configuración del Local</h2>
+                <p class="text-muted small mb-0">Parámetros operativos, aforo, tolerancias y datos de pago</p>
+            </div>
+            <a href="{{ url_for('publico.inicio') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Volver al Inicio
+            </a>
+        </div>
 
-<div class="card shadow-sm border-0">
-    <div class="card-body py-5 text-center text-muted">
-        <i class="bi bi-gear-wide-connected display-3 text-secondary mb-3 d-block"></i>
-        <h4>Módulo de configuración en construcción para la Fase 1</h4>
-        <p>Aquí se gestionarán los parámetros de aforo, mesas, tolerancias y personal del local.</p>
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('admin.config') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <!-- Bloque 1: Identidad y Estado General -->
+                    <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-shop me-2 text-warning"></i>1. Identidad y Estado del Local
+                    </h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8">
+                            <label for="nombre_local" class="form-label fw-semibold">Nombre Comercial del Local</label>
+                            <input type="text" class="form-control" id="nombre_local" name="nombre_local"
+                                   value="{{ config.nombre_local }}" required>
+                            <div class="form-text">Nombre visible en la web pública, tickets y pantallas.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Estado de Atención</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="abierto" name="abierto"
+                                       {{ 'checked' if config.abierto else '' }}>
+                                <label class="form-check-label fw-semibold" for="abierto">
+                                    {{ 'Local Abierto para público' if config.abierto else 'Local Cerrado' }}
+                                </label>
+                            </div>
+                            <div class="form-text">Si está cerrado, la web avisa a los clientes.</div>
+                        </div>
+                    </div>
+
+                    <!-- Bloque 2: Capacidad y Salón -->
+                    <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-people me-2 text-primary"></i>2. Capacidad y Salón
+                    </h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <label for="aforo_personas" class="form-label fw-semibold">Aforo Total (personas)</label>
+                            <input type="number" min="1" class="form-control" id="aforo_personas" name="aforo_personas"
+                                   value="{{ config.aforo_personas }}" required>
+                            <div class="form-text">Capacidad máxima total de clientes sentados.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="total_mesas" class="form-label fw-semibold">Total de Mesas Físicas</label>
+                            <input type="number" min="1" class="form-control" id="total_mesas" name="total_mesas"
+                                   value="{{ config.total_mesas }}" required>
+                            <div class="form-text">Número de mesas disponibles en el salón.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="personas_por_mesa" class="form-label fw-semibold">Personas por Mesa</label>
+                            <input type="number" min="1" class="form-control" id="personas_por_mesa" name="personas_por_mesa"
+                                   value="{{ config.personas_por_mesa }}" required>
+                            <div class="form-text">Para calcular cuántas mesas ocupa un grupo (ej. 4).</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="porcentaje_reservable" class="form-label fw-semibold">% Máximo Reservable</label>
+                            <input type="number" min="1" max="100" class="form-control" id="porcentaje_reservable" name="porcentaje_reservable"
+                                   value="{{ config.porcentaje_reservable or '' }}" placeholder="100">
+                            <div class="form-text">Tope de aforo para reservas web (el resto es para walk-in). Vacío = 100%.</div>
+                        </div>
+                    </div>
+
+                    <!-- Bloque 3: Tiempos y Franjas -->
+                    <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-clock me-2 text-info"></i>3. Horarios y Tiempos Operativos
+                    </h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <label for="hora_apertura" class="form-label fw-semibold">Hora de Apertura</label>
+                            <input type="time" class="form-control" id="hora_apertura" name="hora_apertura"
+                                   value="{{ config.hora_apertura.strftime('%H:%M') if config.hora_apertura else '12:00' }}" required>
+                            <div class="form-text">Inicio de franjas horarias del día.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="hora_cierre" class="form-label fw-semibold">Hora de Cierre</label>
+                            <input type="time" class="form-control" id="hora_cierre" name="hora_cierre"
+                                   value="{{ config.hora_cierre.strftime('%H:%M') if config.hora_cierre else '22:00' }}" required>
+                            <div class="form-text">Límite de atención del día.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="duracion_estadia_min" class="form-label fw-semibold">Duración de Estadía (min)</label>
+                            <input type="number" min="15" step="15" class="form-control" id="duracion_estadia_min" name="duracion_estadia_min"
+                                   value="{{ config.duracion_estadia_min }}" required>
+                            <div class="form-text">Tiempo que una reserva ocupa mesa (ej. 90 min).</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="franja_min" class="form-label fw-semibold">Franja Horaria (min)</label>
+                            <select class="form-select" id="franja_min" name="franja_min" required>
+                                <option value="15" {{ 'selected' if config.franja_min == 15 else '' }}>15 minutos</option>
+                                <option value="30" {{ 'selected' if config.franja_min == 30 else '' }}>30 minutos</option>
+                                <option value="60" {{ 'selected' if config.franja_min == 60 else '' }}>60 minutos (1 hora)</option>
+                            </select>
+                            <div class="form-text">Intervalo entre franjas en la pizarra.</div>
+                        </div>
+                    </div>
+
+                    <!-- Bloque 4: Alertas, Tolerancias y Filtros -->
+                    <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-bell me-2 text-danger"></i>4. Tolerancias, Alertas y Filtros
+                    </h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <label for="tolerancia_min" class="form-label fw-semibold">Tolerancia de Llegada (min)</label>
+                            <input type="number" min="0" class="form-control" id="tolerancia_min" name="tolerancia_min"
+                                   value="{{ config.tolerancia_min }}" required>
+                            <div class="form-text">Pasado este tiempo la app alerta en rojo (el staff decide).</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="umbral_alerta_pct" class="form-label fw-semibold">Alerta de Ocupación (%)</label>
+                            <input type="number" min="1" max="100" class="form-control" id="umbral_alerta_pct" name="umbral_alerta_pct"
+                                   value="{{ config.umbral_alerta_pct }}" required>
+                            <div class="form-text">A partir de este % de ocupación la franja se pinta amarilla.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="umbral_preparacion_min" class="form-label fw-semibold">Tiempo Máx. Cocina (min)</label>
+                            <input type="number" min="1" class="form-control" id="umbral_preparacion_min" name="umbral_preparacion_min"
+                                   value="{{ config.umbral_preparacion_min }}" required>
+                            <div class="form-text">En cocina: tras este tiempo el pedido se resalta en rojo.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="max_reservas_web_por_telefono" class="form-label fw-semibold">Tope Reservas Web / Teléfono</label>
+                            <input type="number" min="1" class="form-control" id="max_reservas_web_por_telefono" name="max_reservas_web_por_telefono"
+                                   value="{{ config.max_reservas_web_por_telefono }}" required>
+                            <div class="form-text">Máximo de reservas web activas por teléfono en 24 h.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="dias_max_anticipacion" class="form-label fw-semibold">Días Máx. Anticipación</label>
+                            <input type="number" min="0" class="form-control" id="dias_max_anticipacion" name="dias_max_anticipacion"
+                                   value="{{ config.dias_max_anticipacion }}" required>
+                            <div class="form-text">Cuántos días hacia adelante puede reservar un cliente.</div>
+                        </div>
+                    </div>
+
+                    <!-- Bloque 5: Datos de Cobro Yape / Plin -->
+                    <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-qr-code me-2 text-success"></i>5. Datos de Pago Yape / Plin
+                    </h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="yape_numero" class="form-label fw-semibold">Número Yape / Plin</label>
+                            <input type="text" class="form-control" id="yape_numero" name="yape_numero"
+                                   value="{{ config.yape_numero or '' }}" placeholder="Ej. 996908138">
+                            <div class="form-text">Número al que el cliente debe transferir para pedidos de recojo.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="yape_titular" class="form-label fw-semibold">Titular de la Cuenta</label>
+                            <input type="text" class="form-control" id="yape_titular" name="yape_titular"
+                                   value="{{ config.yape_titular or '' }}" placeholder="Ej. Dueña Quero Gastrobar">
+                            <div class="form-text">Nombre visible para comprobar el pago.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="mensaje_pago" class="form-label fw-semibold">Mensaje Instrucciones de Pago</label>
+                            <input type="text" class="form-control" id="mensaje_pago" name="mensaje_pago"
+                                   value="{{ config.mensaje_pago or '' }}" placeholder="Ej. Envía captura por WhatsApp al 996908138">
+                            <div class="form-text">Instrucción mostrada en la pantalla de seguimiento del cliente.</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                        <a href="{{ url_for('admin.config') }}" class="btn btn-outline-secondary">Descartar Cambios</a>
+                        <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm" data-requiere-conexion>
+                            <i class="bi bi-save me-1"></i> Guardar Configuración
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

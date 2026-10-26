@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block titulo %}Gestión de Carta - Staff{% endblock %}
+
+{% block estilos %}
+<style>
+    .fila-agotada {
+        background-color: #fff3cd !important;
+    }
+    .form-switch .form-check-input {
+        width: 2.8em;
+        height: 1.4em;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-0"><i class="bi bi-card-checklist text-warning me-2"></i>Gestión de Carta</h2>
+        <p class="text-muted small mb-0">Control rápido de disponibilidad (agotado) y precios en tiempo real</p>
+    </div>
+
+    {% if usuario_actual.es_admin() %}
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-dark btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalCategoria">
+            <i class="bi bi-folder-plus me-1"></i> Nueva Categoría
+        </button>
+        <button class="btn btn-warning btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalPlato">
+            <i class="bi bi-plus-circle me-1"></i> Nuevo Plato
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Alerta de cambio de disponibilidad -->
+<div id="toast-aviso" class="alert alert-success d-none py-2 px-3 mb-3 shadow-sm align-items-center" role="alert">
+    <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+    <span id="toast-mensaje"></span>
+</div>
+
+<!-- Filtro de búsqueda -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" id="filtro-platos" class="form-control border-start-0" placeholder="Buscar plato por nombre o categoría...">
+                </div>
+            </div>
+            <div class="col-md-6 text-md-end text-muted small">
+                Los cambios de disponibilidad se aplican al instante sin recargar la página.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de platos -->
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="tabla-platos">
+            <thead class="table-dark">
+                <tr>
+                    <th>Plato</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th class="text-center" style="width: 150px;">Disponibilidad</th>
+                    {% if usuario_actual.es_admin() %}
+                    <th class="text-end" style="width: 140px;">Acciones</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in platos %}
+                <tr id="fila-plato-{{ p.plato_id }}" class="{{ 'fila-agotada' if not p.disponible else '' }}">
+                    <td>
+                        <div class="fw-bold text-dark">{{ p.nombre }}</div>
+                        {% if p.descripcion %}
+                            <div class="text-muted small text-truncate" style="max-width: 320px;">{{ p.descripcion }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-subtle text-secondary-emphasis border">
+                            {{ p.categoria_nombre }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="fw-bold text-danger fs-6" id="precio-texto-{{ p.plato_id }}">
+                            S/ {{ "%.2f"|format(p.precio) }}
+                        </span>
+                        <button class="btn btn-sm btn-link text-muted p-0 ms-1" title="Editar precio"
+                                onclick="editarPrecio({{ p.plato_id }}, '{{ p.nombre }}', {{ p.precio }})" data-requiere-conexion>
+                            <i class="bi bi-pencil-square"></i>
+                        </button>
+                    </td>
+                    <td class="text-center">
+                        <div class="form-check form-switch d-inline-block">
+                            <input class="form-check-input switch-disponible" type="checkbox" role="switch"
+                                   id="switch-{{ p.plato_id }}" data-id="{{ p.plato_id }}"
+                                   {{ 'checked' if p.disponible else '' }} data-requiere-conexion>
+                            <label class="form-check-label small fw-semibold ms-1 d-block" id="label-{{ p.plato_id }}" for="switch-{{ p.plato_id }}">
+                                {{ 'Disponible' if p.disponible else 'Agotado' }}
+                            </label>
+                        </div>
+                    </td>
+                    {% if usuario_actual.es_admin() %}
+                    <td class="text-end">
+                        <button class="btn btn-outline-primary btn-sm me-1" title="Editar plato"
+                                onclick="abrirEditarPlato({{ p.plato_id }}, {{ p.categoria_id }}, '{{ p.nombre }}', {{ p.precio }}, '{{ p.descripcion or '' }}')"
+                                data-requiere-conexion>
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form method="POST" action="{{ url_for('carta.desactivar_plato', plato_id=p.plato_id) }}" class="d-inline"
+                              onsubmit="return confirm('¿Desactivar el plato \'{{ p.nombre }}\'? Ya no aparecerá en la carta.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" title="Desactivar plato" data-requiere-conexion>
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if usuario_actual.es_admin() %}
+<!-- Modal Crear Plato -->
+<div class="modal fade" id="modalPlato" tabindex="-1" aria-labelledby="modalPlatoLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('carta.crear_plato') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="modalPlatoLabel"><i class="bi bi-plus-circle me-1"></i> Nuevo Plato</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="cat_id" class="form-label fw-semibold">Categoría</label>
+                        <select class="form-select" id="cat_id" name="categoria_id" required>
+                            {% for c in categorias %}
+                                <option value="{{ c.categoria_id }}">{{ c.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="plato_nombre" class="form-label fw-semibold">Nombre del Plato</label>
+                        <input type="text" class="form-control" id="plato_nombre" name="nombre" placeholder="Ej. Lomo Saltado" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="plato_precio" class="form-label fw-semibold">Precio (S/)</label>
+                        <input type="number" step="0.50" min="0" class="form-control" id="plato_precio" name="precio" placeholder="0.00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="plato_desc" class="form-label fw-semibold">Descripción (opcional)</label>
+                        <textarea class="form-control" id="plato_desc" name="descripcion" rows="2" placeholder="Ingredientes o detalles del plato"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold" data-requiere-conexion>Guardar Plato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Plato -->
+<div class="modal fade" id="modalEditarPlato" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="formEditarPlato" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square me-1"></i> Editar Plato</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_cat_id" class="form-label fw-semibold">Categoría</label>
+                        <select class="form-select" id="edit_cat_id" name="categoria_id" required>
+                            {% for c in categorias %}
+                                <option value="{{ c.categoria_id }}">{{ c.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_nombre" class="form-label fw-semibold">Nombre del Plato</label>
+                        <input type="text" class="form-control" id="edit_nombre" name="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_precio" class="form-label fw-semibold">Precio (S/)</label>
+                        <input type="number" step="0.50" min="0" class="form-control" id="edit_precio" name="precio" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_desc" class="form-label fw-semibold">Descripción (opcional)</label>
+                        <textarea class="form-control" id="edit_desc" name="descripcion" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary fw-bold" data-requiere-conexion>Actualizar Plato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nueva Categoría -->
+<div class="modal fade" id="modalCategoria" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('carta.crear_categoria') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-folder-plus me-1"></i> Nueva Categoría</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="cat_nombre" class="form-label fw-semibold">Nombre de la Categoría</label>
+                        <input type="text" class="form-control" id="cat_nombre" name="nombre" placeholder="Ej. Ceviches, Piqueos, Cócteles" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cat_orden" class="form-label fw-semibold">Orden de Visualización</label>
+                        <input type="number" class="form-control" id="cat_orden" name="orden" value="0">
+                        <small class="text-muted">Las categorías con menor número aparecen primero en la carta.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-dark fw-bold" data-requiere-conexion>Crear Categoría</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filtro rápido de búsqueda en la tabla
+    document.getElementById('filtro-platos').addEventListener('keyup', function() {
+        const query = this.value.toLowerCase();
+        const filas = document.querySelectorAll('#tabla-platos tbody tr');
+        filas.forEach(fila => {
+            const texto = fila.textContent.toLowerCase();
+            fila.style.display = texto.includes(query) ? '' : 'none';
+        });
+    });
+
+    // Manejo de interruptor AJAX para disponibilidad (AGENTS.md sección 4b)
+    document.querySelectorAll('.switch-disponible').forEach(sw => {
+        sw.addEventListener('change', async function() {
+            const platoId = this.dataset.id;
+            const nuevoEstado = this.checked;
+            const label = document.getElementById(`label-${platoId}`);
+            const fila = document.getElementById(`fila-plato-${platoId}`);
+
+            try {
+                const resp = await fetch(`/api/v1/platos/${platoId}/disponible`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ disponible: nuevoEstado })
+                });
+
+                const data = await resp.json();
+                if (data.ok) {
+                    label.textContent = nuevoEstado ? 'Disponible' : 'Agotado';
+                    if (nuevoEstado) {
+                        fila.classList.remove('fila-agotada');
+                    } else {
+                        fila.classList.add('fila-agotada');
+                    }
+                    mostrarToast(nuevoEstado ? `Plato disponible en carta.` : `Plato marcado como AGOTADO.`);
+                } else {
+                    alert('Error: ' + (data.error?.mensaje || 'No se pudo actualizar'));
+                    this.checked = !nuevoEstado; // revertir
+                }
+            } catch (err) {
+                alert('Error de conexión con el servidor.');
+                this.checked = !nuevoEstado; // revertir
+            }
+        });
+    });
+
+    // Edición rápida de precio vía prompt y AJAX
+    async function editarPrecio(platoId, nombre, precioActual) {
+        const nuevoPrecio = prompt(`Ingresa el nuevo precio para "${nombre}":`, precioActual);
+        if (nuevoPrecio === null || nuevoPrecio.trim() === '') return;
+
+        const val = parseFloat(nuevoPrecio);
+        if (isNaN(val) || val < 0) {
+            alert('Por favor ingresa un precio válido mayor o igual a 0.');
+            return;
+        }
+
+        try {
+            const resp = await fetch(`/api/v1/platos/${platoId}/precio`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ precio: val })
+            });
+
+            const data = await resp.json();
+            if (data.ok) {
+                document.getElementById(`precio-texto-${platoId}`).textContent = `S/ ${val.toFixed(2)}`;
+                mostrarToast(`Precio de "${nombre}" actualizado a S/ ${val.toFixed(2)}.`);
+            } else {
+                alert('Error: ' + (data.error?.mensaje || 'No se pudo actualizar el precio'));
+            }
+        } catch (err) {
+            alert('Error de conexión.');
+        }
+    }
+
+    // Modal de edición completa de plato
+    function abrirEditarPlato(id, catId, nombre, precio, desc) {
+        document.getElementById('formEditarPlato').action = `/staff/carta/plato/${id}/editar`;
+        document.getElementById('edit_cat_id').value = catId;
+        document.getElementById('edit_nombre').value = nombre;
+        document.getElementById('edit_precio').value = precio;
+        document.getElementById('edit_desc').value = desc;
+
+        const modal = new bootstrap.Modal(document.getElementById('modalEditarPlato'));
+        modal.show();
+    }
+
+    function mostrarToast(mensaje) {
+        const toast = document.getElementById('toast-aviso');
+        const txt = document.getElementById('toast-mensaje');
+        txt.textContent = mensaje;
+        toast.classList.remove('d-none');
+        toast.classList.add('d-flex');
+        setTimeout(() => {
+            toast.classList.add('d-none');
+            toast.classList.remove('d-flex');
+        }, 3500);
+    }
+</script>
+{% endblock %}

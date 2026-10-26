@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nuestra Carta - {{ nombre_local }}{% endblock %}
+
+{% block estilos %}
+<style>
+    .plato-agotado {
+        opacity: 0.6;
+        filter: grayscale(40%);
+    }
+    .badge-agotado {
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+    .nav-pills .nav-link.active {
+        background-color: var(--bs-warning);
+        color: #212529;
+        font-weight: 700;
+    }
+    .nav-pills .nav-link {
+        color: #495057;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<div class="row mb-4">
+    <div class="col-12 text-center">
+        <h1 class="fw-bold display-5 mb-2"><i class="bi bi-book-half text-warning me-2"></i>Nuestra Carta</h1>
+        <p class="text-muted lead">Descubre nuestra variedad de platos marinos, criollos, piqueos y coctelería</p>
+    </div>
+</div>
+
+{% if not carta %}
+    <div class="alert alert-info text-center py-4">
+        <i class="bi bi-info-circle display-4 d-block mb-2"></i>
+        Estamos actualizando nuestra carta. Por favor, vuelve a visitarnos en unos momentos.
+    </div>
+{% else %}
+    <!-- Filtros por categoría (Pills navegables) -->
+    <div class="d-flex justify-content-center flex-wrap gap-2 mb-4">
+        {% for cat in carta %}
+            <a href="#cat-{{ cat.categoria_id }}" class="btn btn-outline-dark btn-sm rounded-pill px-3">
+                {{ cat.nombre }}
+            </a>
+        {% endfor %}
+    </div>
+
+    <!-- Secciones por categoría -->
+    {% for cat in carta %}
+        <div class="mb-5" id="cat-{{ cat.categoria_id }}">
+            <div class="d-flex align-items-center mb-3 border-bottom pb-2">
+                <h3 class="fw-bold text-dark mb-0 me-3">{{ cat.nombre }}</h3>
+                <span class="badge bg-secondary rounded-pill">{{ cat.platos | length }} opciones</span>
+            </div>
+
+            <div class="row g-3">
+                {% for p in cat.platos %}
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="card h-100 shadow-sm border-0 {{ 'plato-agotado bg-light' if not p.disponible else '' }}">
+                            <div class="card-body d-flex flex-column justify-content-between p-3">
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title fw-bold text-dark mb-0">{{ p.nombre }}</h5>
+                                        <span class="fs-5 fw-bold text-danger ms-2 text-nowrap">
+                                            S/ {{ "%.2f"|format(p.precio) }}
+                                        </span>
+                                    </div>
+                                    {% if p.descripcion %}
+                                        <p class="card-text text-muted small mb-2">{{ p.descripcion }}</p>
+                                    {% endif %}
+                                </div>
+
+                                <div class="mt-2 text-end">
+                                    {% if not p.disponible %}
+                                        <span class="badge bg-danger badge-agotado py-1 px-2">
+                                            <i class="bi bi-exclamation-circle me-1"></i> Agotado por hoy
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle py-1 px-2">
+                                            <i class="bi bi-check2 me-1"></i> Disponible
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}

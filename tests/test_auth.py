@@ -4,31 +4,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.db import ejecutar, consultar_uno
 
 
-@pytest.fixture
-def usuario_prueba(app):
-    """Crea usuarios de prueba para admin y empleado."""
-    with app.app_context():
-        # Limpiar usuarios de prueba si existían
-        ejecutar("DELETE FROM personal WHERE correo IN ('admin_test@quero.pe', 'empleado_test@quero.pe')")
-
-        hash_clave = generate_password_hash("clave123")
-        ejecutar(
-            "INSERT INTO personal (nombre, correo, password_hash, rol, activo, debe_cambiar_clave) "
-            "VALUES (%s, %s, %s, 'admin', TRUE, FALSE)",
-            ("Admin Prueba", "admin_test@quero.pe", hash_clave)
-        )
-        ejecutar(
-            "INSERT INTO personal (nombre, correo, password_hash, rol, activo, debe_cambiar_clave) "
-            "VALUES (%s, %s, %s, 'empleado', TRUE, TRUE)",
-            ("Mozo Prueba", "empleado_test@quero.pe", hash_clave)
-        )
-
-    yield
-
-    with app.app_context():
-        ejecutar("DELETE FROM personal WHERE correo IN ('admin_test@quero.pe', 'empleado_test@quero.pe')")
-
-
 def test_login_exitoso_admin(cliente, usuario_prueba):
     """Verifica inicio de sesión exitoso de un admin."""
     resp = cliente.post("/auth/login", data={

@@ -38,11 +38,17 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('publico.inicio') }}"><i class="bi bi-house-door me-1"></i> Inicio</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('publico.carta') }}"><i class="bi bi-book-half me-1"></i> Carta</a>
+                    </li>
 
                     {% if usuario_actual %}
                         <!-- Menú para Personal (Empleado / Admin) -->
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('reservas.pizarra') }}"><i class="bi bi-calendar3 me-1"></i> Reservas</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('carta.listar') }}"><i class="bi bi-card-checklist me-1"></i> Carta Staff</a>
                         </li>
 
                         {% if usuario_actual.es_admin() %}
@@ -52,6 +58,7 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="adminDropdown">
                                 <li><a class="dropdown-item" href="{{ url_for('admin.config') }}"><i class="bi bi-sliders me-2"></i> Configuración Local</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('admin.personal') }}"><i class="bi bi-people-fill me-2"></i> Gestión de Personal</a></li>
                             </ul>
                         </li>
                         {% endif %}

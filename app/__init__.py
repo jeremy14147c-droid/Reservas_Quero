@@ -43,12 +43,14 @@ def create_app(config_class=Config):
     from app.auth import auth_bp
     from app.api import api_bp
     from app.reservas import reservas_bp
+    from app.carta import carta_bp
     from app.admin import admin_bp
 
     app.register_blueprint(publico_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(reservas_bp)
+    app.register_blueprint(carta_bp)
     app.register_blueprint(admin_bp)
 
     # Manejo uniforme de errores (JSON en /api/, HTML en el resto)

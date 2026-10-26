@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block titulo %}Gestión de Personal - Admin{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-0"><i class="bi bi-people-fill text-danger me-2"></i>Gestión de Personal</h2>
+        <p class="text-muted small mb-0">Administración de accesos para mozos, cocina y administradores</p>
+    </div>
+
+    <button class="btn btn-warning btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCrearPersonal">
+        <i class="bi bi-person-plus-fill me-1"></i> Nuevo Colaborador
+    </button>
+</div>
+
+<!-- Listado de personal -->
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Nombre</th>
+                    <th>Correo Electrónico</th>
+                    <th>Rol</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-center">Clave Pendiente</th>
+                    <th class="text-end" style="width: 220px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in personal %}
+                <tr class="{{ 'table-secondary text-muted' if not u.activo else '' }}">
+                    <td>
+                        <div class="fw-bold text-dark">{{ u.nombre }}</div>
+                        {% if u.personal_id == usuario_actual.id %}
+                            <span class="badge bg-info-subtle text-info-emphasis border small">Tú (sesión actual)</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ u.correo }}</td>
+                    <td>
+                        <span class="badge {{ 'bg-danger' if u.rol == 'admin' else 'bg-primary' }}">
+                            {{ u.rol | upper }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        {% if u.activo %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Activo</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-dash-circle me-1"></i> Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if u.debe_cambiar_clave %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-shield-exclamation me-1"></i> Debe cambiar</span>
+                        {% else %}
+                            <span class="badge bg-light text-muted border">Normal</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <!-- Restablecer contraseña -->
+                        <button class="btn btn-outline-secondary btn-sm me-1" title="Restablecer contraseña"
+                                onclick="abrirRestablecerClave({{ u.personal_id }}, '{{ u.nombre }}')" data-requiere-conexion>
+                            <i class="bi bi-key"></i>
+                        </button>
+
+                        <!-- Activar / Desactivar -->
+                        {% if u.personal_id != usuario_actual.id %}
+                            <form method="POST" action="{{ url_for('admin.cambiar_estado_personal', personal_id=u.personal_id) }}" class="d-inline"
+                                  onsubmit="return confirm('¿Seguro que deseas {{ 'desactivar' if u.activo else 'reactivar' }} a {{ u.nombre }}?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="activo" value="{{ 'false' if u.activo else 'true' }}">
+                                {% if u.activo %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Desactivar cuenta" data-requiere-conexion>
+                                        <i class="bi bi-person-x"></i> Desactivar
+                                    </button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-outline-success btn-sm" title="Reactivar cuenta" data-requiere-conexion>
+                                        <i class="bi bi-person-check"></i> Activar
+                                    </button>
+                                {% endif %}
+                            </form>
+                        {% else %}
+                            <button class="btn btn-outline-secondary btn-sm disabled" disabled title="No puedes desactivarte a ti mismo">
+                                <i class="bi bi-shield-lock"></i>
+                            </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Crear Colaborador -->
+<div class="modal fade" id="modalCrearPersonal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('admin.crear_personal') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-person-plus-fill me-1"></i> Registrar Colaborador</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nuevo_nombre" class="form-label fw-semibold">Nombre y Apellido</label>
+                        <input type="text" class="form-control" id="nuevo_nombre" name="nombre" placeholder="Ej. Carlos Ramos" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nuevo_correo" class="form-label fw-semibold">Correo Electrónico (acceso al sistema)</label>
+                        <input type="email" class="form-control" id="nuevo_correo" name="correo" placeholder="ejemplo@quero.pe" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nuevo_rol" class="form-label fw-semibold">Rol Asignado</label>
+                        <select class="form-select" id="nuevo_rol" name="rol" required>
+                            <option value="empleado">Empleado (Atención, Mozos, Cocina)</option>
+                            <option value="admin">Administrador (Control total del local)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nuevo_password" class="form-label fw-semibold">Contraseña Temporal Inicial</label>
+                        <input type="password" class="form-control" id="nuevo_password" name="password" minlength="6" placeholder="Mínimo 6 caracteres" required>
+                        <small class="text-muted d-block mt-1">
+                            <i class="bi bi-info-circle me-1"></i> El colaborador estará obligado a cambiar su clave en su primer inicio de sesión.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold" data-requiere-conexion>Crear Cuenta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Restablecer Contraseña -->
+<div class="modal fade" id="modalRestablecer" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="formRestablecer" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-key-fill me-1"></i> Restablecer Contraseña</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Asigna una nueva clave temporal para <strong id="nombre-colaborador"></strong>:</p>
+                    <div class="mb-3">
+                        <label for="nueva_clave_temp" class="form-label fw-semibold">Nueva Clave Temporal</label>
+                        <input type="password" class="form-control" id="nueva_clave_temp" name="nueva_clave" minlength="6" required>
+                        <small class="text-muted">Se obligará al usuario a cambiarla en su siguiente acceso.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger fw-bold" data-requiere-conexion>Guardar Nueva Clave</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function abrirRestablecerClave(id, nombre) {
+        document.getElementById('formRestablecer').action = `/admin/personal/${id}/restablecer-clave`;
+        document.getElementById('nombre-colaborador').textContent = nombre;
+        document.getElementById('nueva_clave_temp').value = '';
+
+        const modal = new bootstrap.Modal(document.getElementById('modalRestablecer'));
+        modal.show();
+    }
+</script>
+{% endblock %}
