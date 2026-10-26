@@ -141,6 +141,11 @@ quero/
 - Un pedido `recojo` aceptado pasa a `en_preparacion` (cocina) solo cuando queda cobrado.
   Un pedido `local` creado por el staff nace `en_preparacion` y puede cobrarse en cualquier momento.
 - `precio_venta` se copia del `precio` del plato al crear la línea. No se puede pedir un plato con `disponible = FALSE` o `activo = FALSE`.
+- **Código del plato:** `plato.codigo` es un número corto, único y opcional que define la dueña (no es el `plato_id`). En "Nuevo pedido en local" se puede buscar por nombre,
+  por categoría o escribiendo el número: el número muestra solo el plato cuyo código coincide exactamente (`1` no trae el 10 ni el 11). La carta pública puede mostrarlo junto al nombre.
+  Los platos desactivados conservan su código reservado.
+- **Platos con dos precios:** cada tamaño o presentación se registra como un plato aparte (por ejemplo "Ceviche de pescado — Personal" y "— Fuente"), con su precio y su código.
+  Solo se crea una variante cuando cambia el precio; los sabores con el mismo precio van en la nota del pedido y los ingredientes en la descripción. No agregar una segunda columna de precio.
 - El cliente sigue su pedido en `/pedido/<token>` (UUID, no el id). Esa página muestra estado, total, y las instrucciones de pago
   (datos Yape de `config_local`) cuando está `aceptado` y por cobrar.
 - **Cocina:** cada pedido en preparación muestra el tiempo transcurrido desde `preparacion_en`. Si supera `umbral_preparacion_min` de `config_local`,

@@ -7,6 +7,8 @@
 -- modificar estas tablas.
 --
 -- CAMBIOS v3 respecto a v2:
+--  * plato: nuevo codigo (número corto único y opcional para buscar el plato). Los platos con
+--    dos precios se registran como dos platos (una variante por precio).
 --  * config_local: nuevo max_reservas_web_por_telefono (tope de reservas web por teléfono en 24 h).
 --  * v_cliente_actividad_24h: pedidos y reservas recientes del cliente (se calcula, no se guarda).
 --  * El contacto NO se verifica con códigos: el teléfono es obligatorio y único, el correo es
@@ -84,9 +86,13 @@ CREATE TABLE categoria (
   activa        BOOLEAN     NOT NULL DEFAULT TRUE
 );
 
+-- Un plato con dos precios (personal / fuente, 1 L / 1½ L) se registra como DOS platos,
+-- uno por tamaño, cada uno con su precio y su código. Los sabores sin cambio de precio
+-- van en la nota del pedido, no como platos distintos.
 CREATE TABLE plato (
   plato_id      INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   categoria_id  INT NOT NULL REFERENCES categoria (categoria_id),
+  codigo        INT NULL UNIQUE CHECK (codigo > 0),   -- número corto para buscar el plato (lo define la dueña; no es el ID)
   nombre        VARCHAR(100) NOT NULL,
   descripcion   VARCHAR(300) NULL,
   precio        NUMERIC(10,2) NOT NULL CHECK (precio >= 0),
