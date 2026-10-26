@@ -21,6 +21,7 @@
 
                 <form method="POST" action="{{ url_for('publico.reservar') }}"
                       class="needs-validation" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                     <!-- Campo trampa (honeypot): invisible para personas -->
                     <input type="text" name="pagina_web" id="pagina_web" class="d-none" tabindex="-1" autocomplete="off">
