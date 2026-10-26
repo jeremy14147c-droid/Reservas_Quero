@@ -44,14 +44,18 @@
 <div class="card shadow-sm border-0 mb-4">
     <div class="card-body p-3">
         <div class="row g-2 align-items-center">
-            <div class="col-md-6">
+            <div class="col-md-7">
                 <div class="input-group">
                     <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                    <input type="text" id="filtro-platos" class="form-control border-start-0" placeholder="Buscar plato por nombre o categoría...">
+                    <input type="text" id="filtro-platos" class="form-control border-start-0"
+                           placeholder="Buscar por código exacto (ej. 1) o por nombre (ej. ceviche)...">
+                    <button class="btn btn-outline-secondary" type="button" id="btn-limpiar-busqueda" title="Limpiar búsqueda">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
             </div>
-            <div class="col-md-6 text-md-end text-muted small">
-                Los cambios de disponibilidad se aplican al instante sin recargar la página.
+            <div class="col-md-5 text-md-end text-muted small">
+                Escribir un número filtra por código exacto (1 no trae 10 ni 11).
             </div>
         </div>
     </div>
@@ -63,6 +67,7 @@
         <table class="table table-hover align-middle mb-0" id="tabla-platos">
             <thead class="table-dark">
                 <tr>
+                    <th style="width: 80px;" class="text-center">Cód.</th>
                     <th>Plato</th>
                     <th>Categoría</th>
                     <th>Precio</th>
@@ -74,7 +79,18 @@
             </thead>
             <tbody>
                 {% for p in platos %}
-                <tr id="fila-plato-{{ p.plato_id }}" class="{{ 'fila-agotada' if not p.disponible else '' }}">
+                <tr id="fila-plato-{{ p.plato_id }}"
+                    class="{{ 'fila-agotada' if not p.disponible else '' }}"
+                    data-codigo="{{ p.codigo or '' }}"
+                    data-nombre="{{ p.nombre }}"
+                    data-categoria="{{ p.categoria_nombre }}">
+                    <td class="text-center">
+                        {% if p.codigo %}
+                            <span class="badge bg-dark fs-6">#{{ p.codigo }}</span>
+                        {% else %}
+                            <span class="text-muted small">&mdash;</span>
+                        {% endif %}
+                    </td>
                     <td>
                         <div class="fw-bold text-dark">{{ p.nombre }}</div>
                         {% if p.descripcion %}
@@ -108,7 +124,7 @@
                     {% if usuario_actual.es_admin() %}
                     <td class="text-end">
                         <button class="btn btn-outline-primary btn-sm me-1" title="Editar plato"
-                                onclick="abrirEditarPlato({{ p.plato_id }}, {{ p.categoria_id }}, '{{ p.nombre }}', {{ p.precio }}, '{{ p.descripcion or '' }}')"
+                                onclick="abrirEditarPlato({{ p.plato_id }}, {{ p.categoria_id }}, '{{ p.codigo or '' }}', '{{ p.nombre }}', {{ p.precio }}, '{{ p.descripcion or '' }}')"
                                 data-requiere-conexion>
                             <i class="bi bi-pencil"></i>
                         </button>
@@ -140,17 +156,31 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="cat_id" class="form-label fw-semibold">Categoría</label>
-                        <select class="form-select" id="cat_id" name="categoria_id" required>
-                            {% for c in categorias %}
-                                <option value="{{ c.categoria_id }}">{{ c.nombre }}</option>
-                            {% endfor %}
-                        </select>
+                    <!-- Aviso oficial sobre platos con dos precios -->
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        <strong>Aviso sobre platos con dos precios:</strong> Si el plato tiene dos precios (por ejemplo personal y fuente), créalo dos veces, una por tamaño, cada una con su precio y su código. Los sabores con el mismo precio no son platos distintos.
                     </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label for="cat_id" class="form-label fw-semibold">Categoría</label>
+                            <select class="form-select" id="cat_id" name="categoria_id" required>
+                                {% for c in categorias %}
+                                    <option value="{{ c.categoria_id }}">{{ c.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label for="plato_codigo" class="form-label fw-semibold">Código (opcional)</label>
+                            <input type="number" min="1" class="form-control" id="plato_codigo" name="codigo" placeholder="Ej. 1">
+                            <div class="form-text small">Número corto; no se repite.</div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label for="plato_nombre" class="form-label fw-semibold">Nombre del Plato</label>
-                        <input type="text" class="form-control" id="plato_nombre" name="nombre" placeholder="Ej. Lomo Saltado" required>
+                        <input type="text" class="form-control" id="plato_nombre" name="nombre" placeholder="Ej. Ceviche de Pescado — Personal" required>
                     </div>
                     <div class="mb-3">
                         <label for="plato_precio" class="form-label fw-semibold">Precio (S/)</label>
@@ -181,14 +211,27 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="edit_cat_id" class="form-label fw-semibold">Categoría</label>
-                        <select class="form-select" id="edit_cat_id" name="categoria_id" required>
-                            {% for c in categorias %}
-                                <option value="{{ c.categoria_id }}">{{ c.nombre }}</option>
-                            {% endfor %}
-                        </select>
+                    <div class="alert alert-info py-2 small mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        <strong>Aviso sobre platos con dos precios:</strong> Si el plato tiene dos precios (por ejemplo personal y fuente), créalo dos veces, una por tamaño, cada una con su precio y su código.
                     </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label for="edit_cat_id" class="form-label fw-semibold">Categoría</label>
+                            <select class="form-select" id="edit_cat_id" name="categoria_id" required>
+                                {% for c in categorias %}
+                                    <option value="{{ c.categoria_id }}">{{ c.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label for="edit_codigo" class="form-label fw-semibold">Código (opcional)</label>
+                            <input type="number" min="1" class="form-control" id="edit_codigo" name="codigo">
+                            <div class="form-text small">Número corto; no se repite.</div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label for="edit_nombre" class="form-label fw-semibold">Nombre del Plato</label>
                         <input type="text" class="form-control" id="edit_nombre" name="nombre" required>
@@ -246,14 +289,46 @@
 
 {% block scripts %}
 <script>
-    // Filtro rápido de búsqueda en la tabla
-    document.getElementById('filtro-platos').addEventListener('keyup', function() {
-        const query = this.value.toLowerCase();
+    function quitarAcentos(str) {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    }
+
+    // Buscador interactivo por nombre o código exacto (AGENTS.md y Fase 1.1)
+    const inputFiltro = document.getElementById('filtro-platos');
+    const btnLimpiar = document.getElementById('btn-limpiar-busqueda');
+
+    function aplicarFiltro() {
+        const query = inputFiltro.value.trim();
         const filas = document.querySelectorAll('#tabla-platos tbody tr');
-        filas.forEach(fila => {
-            const texto = fila.textContent.toLowerCase();
-            fila.style.display = texto.includes(query) ? '' : 'none';
-        });
+
+        if (!query) {
+            filas.forEach(f => f.style.display = '');
+            return;
+        }
+
+        // Si son solo dígitos: coincidencia EXACTA de código (1 no debe traer 10 ni 11)
+        if (/^\d+$/.test(query)) {
+            filas.forEach(fila => {
+                const codigoFila = (fila.dataset.codigo || '').trim();
+                fila.style.display = (codigoFila === query) ? '' : 'none';
+            });
+        } else {
+            // Si es texto: búsqueda insensible a mayúsculas y acentos
+            const queryNorm = quitarAcentos(query);
+            filas.forEach(fila => {
+                const nombreNorm = quitarAcentos(fila.dataset.nombre || '');
+                const catNorm = quitarAcentos(fila.dataset.categoria || '');
+                const coincide = nombreNorm.includes(queryNorm) || catNorm.includes(queryNorm);
+                fila.style.display = coincide ? '' : 'none';
+            });
+        }
+    }
+
+    inputFiltro.addEventListener('input', aplicarFiltro);
+    btnLimpiar.addEventListener('click', () => {
+        inputFiltro.value = '';
+        aplicarFiltro();
+        inputFiltro.focus();
     });
 
     // Manejo de interruptor AJAX para disponibilidad (AGENTS.md sección 4b)
@@ -285,11 +360,11 @@
                     mostrarToast(nuevoEstado ? `Plato disponible en carta.` : `Plato marcado como AGOTADO.`);
                 } else {
                     alert('Error: ' + (data.error?.mensaje || 'No se pudo actualizar'));
-                    this.checked = !nuevoEstado; // revertir
+                    this.checked = !nuevoEstado;
                 }
             } catch (err) {
                 alert('Error de conexión con el servidor.');
-                this.checked = !nuevoEstado; // revertir
+                this.checked = !nuevoEstado;
             }
         });
     });
@@ -328,9 +403,10 @@
     }
 
     // Modal de edición completa de plato
-    function abrirEditarPlato(id, catId, nombre, precio, desc) {
+    function abrirEditarPlato(id, catId, codigo, nombre, precio, desc) {
         document.getElementById('formEditarPlato').action = `/staff/carta/plato/${id}/editar`;
         document.getElementById('edit_cat_id').value = catId;
+        document.getElementById('edit_codigo').value = codigo;
         document.getElementById('edit_nombre').value = nombre;
         document.getElementById('edit_precio').value = precio;
         document.getElementById('edit_desc').value = desc;

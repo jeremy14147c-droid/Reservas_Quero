@@ -79,6 +79,37 @@ Presenta el plan antes de programar.
 ```
 
 ---
+## Fase 1.1 – Código de plato, búsqueda y platos con dos precios
+
+Contexto: AGENTS.md (versión nueva, sección del código de plato y de los platos con dos precios) y schema.sql. Fases 0 y 1 ya están hechas. Esta es la Fase 1.1.
+
+Objetivo: agregar el código de plato y la búsqueda por nombre o número, sin tocar nada más.
+
+Antes de programar (solo lectura): compara la base de datos y el código con schema.sql y AGENTS.md y dime las diferencias que encuentres. Revisa en especial:
+plato.codigo, config_local.umbral_alerta_pct, config_local.max_reservas_web_por_telefono, reserva.excede_cupo, la vista v_cliente_actividad_24h,
+que fn_carga_dia devuelva la columna nivel y que cliente NO tenga la columna documento. Si falta algo del esquema, dame el comando SQL exacto y espera mi aprobación:
+no modifiques la base de datos ni schema.sql por tu cuenta.
+
+Haz:
+1. Servicio de carta (app/servicios/): soportar plato.codigo, que es un número entero mayor que cero, único y opcional, y NO es el plato_id.
+   Si el código ya existe, devuelve un mensaje claro (nunca un error 500). Varios platos pueden tener el código vacío. Un plato desactivado conserva su código (no se reutiliza).
+2. Búsqueda de platos: una función reutilizable buscar_platos(texto) en app/servicios/. Si el texto son solo dígitos, devuelve el plato activo cuyo código coincide EXACTAMENTE
+   (1 no debe traer el 10 ni el 11); si no, busca por nombre sin distinguir mayúsculas ni tildes. Expónla como GET /api/v1/platos/buscar?q=... (JSON: id, codigo, nombre, precio,
+   disponible y categoría; solo platos activos). La usará la Fase 3 en "Nuevo pedido en local"; NO construyas esa pantalla ahora.
+3. Carta pública /carta: muestra el código junto al nombre cuando exista, y mantiene los agotados marcados y los inactivos ocultos.
+4. Carta del staff /staff/carta: agrega un buscador por nombre o número (usa buscar_platos) y muestra el código. Empleado y admin pueden buscar y cambiar disponible y precio;
+   solo el admin crea o edita platos, y por lo tanto solo el admin asigna o cambia el código.
+5. Formulario de plato (solo admin): campo "Código (opcional)" con ayuda breve ("Número corto para buscar el plato; no se repite") y un aviso:
+   "Si el plato tiene dos precios (por ejemplo personal y fuente), créalo dos veces, una por tamaño, cada una con su precio y su código. Los sabores con el mismo precio no son platos distintos."
+   No agregues una segunda columna de precio ni tablas nuevas.
+6. Si /admin/config no tiene los campos de umbral de alerta de ocupación (%) y de máximo de reservas web por teléfono en 24 h, agrégalos con sus validaciones. Si ya existen, no cambies nada.
+7. Si seed.sql inserta platos, asígnales códigos de ejemplo y deja un par de variantes de ejemplo (un mismo plato en dos tamaños). Avísame qué cambiaste.
+8. Pruebas con pytest: el código exacto no trae coincidencias parciales; un código repetido se rechaza con mensaje claro; dos platos sin código son válidos;
+   un plato desactivado conserva su código; un empleado no puede crear platos ni cambiar códigos; la búsqueda por nombre ignora mayúsculas y tildes.
+
+Criterio de terminado: en /staff/carta escribo 1 y aparece solo el plato con código 1; escribo "cevi" y aparecen los ceviches; intento repetir un código y veo un mensaje claro;
+creo el mismo plato en dos tamaños con precio y código distintos y aparecen como dos platos en /carta. Prueba en el navegador y reporta.
+Presenta el plan antes de programar. No cambies el esquema ni agregues paquetes sin avisarme.
 
 ## Fase 2 – Reservas (núcleo)
 ```

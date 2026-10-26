@@ -13,6 +13,29 @@ def salud():
     return respuesta_ok({"estado": "vivo"})
 
 
+@api_bp.route("/platos/buscar", methods=["GET"])
+@requiere_rol("admin", "empleado")
+def buscar_platos():
+    """Busca platos activos por código numérico exacto o por nombre (insensible a tildes y mayúsculas).
+    Retorna id, codigo, nombre, precio, disponible y categoria_nombre.
+    """
+    query = request.args.get("q", "")
+    platos = servicio_carta.buscar_platos(query)
+    # Formatear salida uniforme
+    datos = [
+        {
+            "id": p["plato_id"],
+            "codigo": p["codigo"],
+            "nombre": p["nombre"],
+            "precio": float(p["precio"]),
+            "disponible": p["disponible"],
+            "categoria": p["categoria_nombre"]
+        }
+        for p in platos
+    ]
+    return respuesta_ok(datos)
+
+
 @api_bp.route("/platos/<int:plato_id>/disponible", methods=["POST"])
 @requiere_rol("admin", "empleado")
 def cambiar_disponible(plato_id):

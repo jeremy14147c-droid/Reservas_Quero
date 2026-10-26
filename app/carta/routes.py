@@ -19,12 +19,13 @@ def listar():
 def crear_plato():
     """Crea un nuevo plato (solo rol admin)."""
     categoria_id = request.form.get("categoria_id")
+    codigo = request.form.get("codigo")
     nombre = request.form.get("nombre")
     precio = request.form.get("precio")
     descripcion = request.form.get("descripcion")
 
     try:
-        servicio_carta.crear_plato(categoria_id, nombre, precio, descripcion)
+        servicio_carta.crear_plato(categoria_id, nombre, precio, descripcion, codigo=codigo)
         flash("Plato creado exitosamente.", "success")
     except ValueError as e:
         flash(str(e), "danger")
@@ -39,12 +40,13 @@ def crear_plato():
 def editar_plato(plato_id):
     """Edita un plato existente (solo rol admin)."""
     categoria_id = request.form.get("categoria_id")
+    codigo = request.form.get("codigo")
     nombre = request.form.get("nombre")
     precio = request.form.get("precio")
     descripcion = request.form.get("descripcion")
 
     try:
-        servicio_carta.editar_plato(plato_id, categoria_id, nombre, precio, descripcion)
+        servicio_carta.editar_plato(plato_id, categoria_id, nombre, precio, descripcion, codigo=codigo)
         flash("Plato actualizado exitosamente.", "success")
     except ValueError as e:
         flash(str(e), "danger")
