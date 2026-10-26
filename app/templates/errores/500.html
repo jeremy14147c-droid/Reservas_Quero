@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block titulo %}Error del Servidor (500){% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-6 text-center">
+        <i class="bi bi-exclamation-triangle text-danger display-1 mb-3 d-block"></i>
+        <h1 class="fw-bold">500 - Error Interno</h1>
+        <p class="lead text-muted">Ocurrió un error inesperado al procesar tu solicitud.</p>
+        <a href="{{ url_for('publico.inicio') }}" class="btn btn-primary mt-2">
+            <i class="bi bi-house-door me-1"></i> Volver al Inicio
+        </a>
+    </div>
+</div>
+{% endblock %}

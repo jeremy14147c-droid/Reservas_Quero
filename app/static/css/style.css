@@ -1,0 +1,46 @@
+/* Estilos generales para Quero Gastrobar */
+:root {
+    --quero-rojo: #b22222;
+    --quero-dorado: #e67e22;
+    --quero-oscuro: #212529;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: #f8f9fa;
+}
+
+main {
+    flex: 1;
+}
+
+/* Banner superior fijo para aviso sin conexión */
+#banner-sin-conexion {
+    position: sticky;
+    top: 0;
+    z-index: 1055;
+    font-weight: 600;
+}
+
+/* Navbar */
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+/* Tarjetas y botones mobile-first */
+.btn-lg-mobile {
+    padding: 0.75rem 1.25rem;
+    font-size: 1.1rem;
+    border-radius: 0.5rem;
+}
+
+@media (max-width: 576px) {
+    .btn-lg-mobile {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+}

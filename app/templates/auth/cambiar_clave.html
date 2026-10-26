@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block titulo %}Cambiar Contraseña - Quero Gastrobar{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-6 col-lg-5">
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-key-fill text-danger display-4"></i>
+                    <h3 class="card-title fw-bold mt-2">Cambiar Contraseña</h3>
+                    <p class="text-muted small">Por motivos de seguridad debes actualizar tu clave de acceso</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.cambiar_clave') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-3">
+                        <label for="clave_actual" class="form-label fw-semibold">Contraseña Actual</label>
+                        <input type="password" class="form-control" id="clave_actual" name="clave_actual" required autofocus>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="nueva_clave" class="form-label fw-semibold">Nueva Contraseña (mínimo 6 caracteres)</label>
+                        <input type="password" class="form-control" id="nueva_clave" name="nueva_clave" minlength="6" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="confirmar_clave" class="form-label fw-semibold">Confirmar Nueva Contraseña</label>
+                        <input type="password" class="form-control" id="confirmar_clave" name="confirmar_clave" minlength="6" required>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold" data-requiere-conexion>
+                            <i class="bi bi-check-circle me-1"></i> Guardar Nueva Contraseña
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

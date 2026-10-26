@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pizarra de Reservas - Staff{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-0"><i class="bi bi-calendar3 text-warning me-2"></i>Pizarra de Reservas</h2>
+        <p class="text-muted small mb-0">Control diario de aforo y ocupación</p>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body py-5 text-center text-muted">
+        <i class="bi bi-calendar-event display-3 text-secondary mb-3 d-block"></i>
+        <h4>Pizarra en construcción para la Fase 2</h4>
+        <p>Aquí se visualizarán las franjas horarias y reservas del día con recarga automática cada 10 s.</p>
+    </div>
+</div>
+{% endblock %}

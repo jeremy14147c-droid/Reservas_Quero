@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block titulo %}Página No Encontrada (404){% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-6 text-center">
+        <i class="bi bi-compass text-warning display-1 mb-3 d-block"></i>
+        <h1 class="fw-bold">404 - Página No Encontrada</h1>
+        <p class="lead text-muted">La ruta o recurso que buscas no existe o ha sido movido.</p>
+        <a href="{{ url_for('publico.inicio') }}" class="btn btn-primary mt-2">
+            <i class="bi bi-house-door me-1"></i> Volver al Inicio
+        </a>
+    </div>
+</div>
+{% endblock %}
