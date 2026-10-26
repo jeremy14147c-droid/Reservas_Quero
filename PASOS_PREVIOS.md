@@ -65,6 +65,20 @@ Aforo, número de mesas, personas por mesa, duración de una estadía, horario, 
 la carta con precios, y el número y titular de su Yape. También la marca, el modelo, la conexión y el ancho de papel de su tiquetera (ver `GUIA_IMPRESION.md`).
 El `seed.sql` trae valores de ejemplo. Con el `schema.sql` nuevo, `seed.sql` no debe insertar la columna `documento` en `cliente` (se eliminó); `umbral_alerta_pct` tiene valor por defecto.
 
+La dueña respuesta: 
+
+- Aforo	Máximo de personas que caben en el local a la vez	60 personas	aforo_personas
+- Número de mesas	Cuántas mesas tiene el salón	15 mesas	total_mesas
+- Personas por mesa	Cuántas personas se sientan en una mesa normal; con esto se calcula cuántas mesas ocupa un grupo	4 personas personas_por_mesa
+- Duración de una estadía	Cuánto tiempo suele ocupar una mesa un grupo	90 minutos	duracion_estadia_min
+- Horario	Hora de apertura y de cierre	el horario varia, abre siempre a la misma hora los dias que abre y lo mismo que cuando cierra	hora_apertura, hora_cierre
+- Tolerancia	Cuánto espera el local a un cliente con reserva antes de marcarlo en rojo	20 minutos	tolerancia_min
+- % de ocupación para la alerta	Desde qué porcentaje de llenado la franja se pone en amarillo (“a punto de llenarse”)	80 %	umbral_alerta_pct
+- Reservas web por teléfono en 24 h	Tope de reservas que un mismo teléfono puede pedir por la web en un día =	2	max_reservas_web_por_telefono
+- Tiempo máximo de preparación	Pasado este tiempo, el pedido se resalta en rojo en cocina	20 minutos	umbral_preparacion_min
+- Días de anticipación	Con cuántos días de adelanto se puede reservar como máximo	2 días	dias_max_anticipacion
+Yape	Número y nombre del titular para mostrar al cliente al cobrar 996908138 Jhoana yape_numero, yape_titular
+
 ## 7. Impresión de tickets
 Lee `GUIA_IMPRESION.md` antes de la Fase 4 y averigua con la dueña los datos de su tiquetera. El sistema es solo web: no hay app que instalar.
 
