@@ -161,8 +161,10 @@ def horarios_con_semaforo(fecha):
 
 # ---------------------------------------------------------------- creación
 
-def _datos_comunes_validados(datos):
-    """Validaciones compartidas por la web y el staff. Devuelve (nombre, telefono, correo, fecha, hora, personas)."""
+def _datos_comunes_validados(datos, exigir_consentimiento=True):
+    """Validaciones compartidas por la web y el staff. Devuelve (nombre, telefono, correo, fecha, personas).
+    El consentimiento es obligatorio SOLO en el formulario público; el staff lo toma presencialmente.
+    """
     nombre = (datos.get("nombre") or "").strip()
     if not nombre:
         raise ValueError("El nombre del cliente es obligatorio.")
@@ -177,7 +179,7 @@ def _datos_comunes_validados(datos):
     if correo and ("@" not in correo or len(correo) > 120):
         raise ValueError("El correo es opcional, pero si se escribe debe ser válido.")
 
-    if not datos.get("acepta_datos"):
+    if exigir_consentimiento and not datos.get("acepta_datos"):
         raise ValueError("Se necesita tu consentimiento para tratar los datos de la reserva.")
 
     fecha = validar_fecha(datos.get("fecha"))
@@ -261,7 +263,7 @@ def crear_reserva_staff(datos, personal_id, forzar=False):
     Si no hay cupo se lanza CupoNoDisponible (advertencia); con forzar=True se registra
     igual y queda marcada con excede_cupo = TRUE (el staff nunca queda bloqueado).
     """
-    nombre, telefono, correo, fecha, personas = _datos_comunes_validados(datos)
+    nombre, telefono, correo, fecha, personas = _datos_comunes_validados(datos, exigir_consentimiento=False)
     hora = validar_hora_en_franjas(fecha, datos.get("hora"))
 
     nota = (datos.get("nota") or "").strip() or None
