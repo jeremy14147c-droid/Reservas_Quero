@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Reserva {{ reserva.codigo }} - Ticket</title>
+    <style>
+        /* Ticket de tiquetera: 80 mm por defecto (cambiar a 58 mm ajustando la variable) */
+        :root {
+            --ticket-ancho: 80mm;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #eee;
+            color: #000;
+        }
+        .ticket {
+            width: var(--ticket-ancho);
+            margin: 12px auto;
+            background: #fff;
+            padding: 10px 8px;
+            border: 1px dashed #999;
+        }
+        .ticket .etiqueta-grande {
+            font-size: 42px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-align: center;
+            line-height: 1.1;
+        }
+        .ticket .subtitulo {
+            text-align: center;
+            font-size: 11px;
+            color: #333;
+            margin-bottom: 6px;
+        }
+        .linea-punteada {
+            border-top: 1px dashed #000;
+            margin: 6px 0;
+        }
+        .campo {
+            display: flex;
+            justify-content: space-between;
+            gap: 6px;
+            font-size: 13px;
+            margin: 2px 0;
+        }
+        .campo strong { font-size: 14px; }
+        .cambio-hora {
+            background: #f3d00033;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 4px 2px;
+        }
+        .qr-zona {
+            text-align: center;
+            margin-top: 8px;
+        }
+        .qr-zona img { width: 34mm; height: 34mm; }
+        .qr-nota { font-size: 10px; text-align: center; color: #333; }
+        .acciones {
+            margin: 10px auto;
+            width: max-content;
+            display: flex;
+            gap: 8px;
+        }
+        .acciones button {
+            padding: 8px 18px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        /* Impresión: sin márgenes ni encabezados del navegador, solo el ticket */
+        @media print {
+            body { background: #fff; }
+            .ticket { border: none; margin: 0; }
+            .acciones { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="acciones">
+        <button onclick="window.print()">&nbsp;i&nbsp;&nbsp;Imprimir</button>
+        <button onclick="window.print()">Reimprimir</button>
+    </div>
+
+    <div class="ticket">
+        <!-- Etiqueta de lo que es: RESERVA -->
+        <div class="etiqueta-grande">RESERVA</div>
+        <div class="subtitulo">Quero Gastrobar &nbsp;·&nbsp; Reserva de mesa</div>
+        <div class="linea-punteada"></div>
+
+        <div class="campo"><span>Código:</span><strong>{{ reserva.codigo }}</strong></div>
+        <div class="campo"><span>Cliente:</span><strong>{{ reserva.cliente_nombre }}</strong></div>
+        <div class="campo"><span>Fecha:</span><strong>{{ utils_fecha(reserva.fecha) }}</strong></div>
+        {% if reserva.hora_anterior %}
+            <div class="cambio-hora">ANTES {{ utils_hora12(reserva.hora_anterior) }} &rarr; AHORA {{ utils_hora12(reserva.hora) }}</div>
+        {% else %}
+            <div class="campo"><span>Hora:</span><strong>{{ utils_hora12(reserva.hora) }}</strong></div>
+        {% endif %}
+        <div class="campo"><span>Personas:</span><strong>{{ reserva.cantidad_personas }}</strong></div>
+        {% if reserva.nota %}
+            <div class="campo"><span>Nota:</span><span>{{ reserva.nota }}</span></div>
+        {% endif %}
+
+        <div class="linea-punteada"></div>
+        <div class="qr-zona">
+            <!-- El staff lo escanea con la cámara: abre el detalle (pide login si falta) -->
+            <img src="{{ qr }}" alt="QR del detalle">
+            <div class="qr-nota">Escanea para ver el detalle en el panel</div>
+        </div>
+    </div>
+</body>
+</html>
