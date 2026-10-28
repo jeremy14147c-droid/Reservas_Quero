@@ -24,9 +24,28 @@
         border-color: #dc3545 !important;
         background-color: #f8d7da;
     }
-    .marca-continua {
-        font-size: 0.7rem;
+    /* Línea compacta "↳ ... continúa" en franjas posteriores (sin botones) */
+    .linea-continua {
+        font-size: 0.78rem;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 2px 6px;
+        margin: 0 2px 4px 0;
+        border-left: 2px solid #adb5bd;
+        white-space: nowrap;   /* el texto compacto no se corta */
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
+    .linea-continua:hover { background-color: #f1f3f5; }
+    /* Destello al tocar una línea compacta: ubica y resalta la tarjeta original */
+    .resalta-flash { animation: resalta 1.6s ease; }
+    @keyframes resalta {
+        0%, 100% { box-shadow: none; }
+        30%, 70% { box-shadow: 0 0 0 4px rgba(255, 193, 7, .8); }
+    }
+    /* Fila de ocupación: barras apiladas para que el texto no se corte en celular */
+    .barra-ocupacion { margin-bottom: 4px; }
+    .ocupacion-resumen { white-space: nowrap; }
     .badge-capa { font-size: 0.72rem; }
     .menu-acciones .dropdown-menu { min-width: 210px; }
 </style>
@@ -322,8 +341,6 @@ function pintarPendientes() {
 function pintarFranjas() {
     let html = '';
     (datosDia.franjas || []).forEach(f => {
-        const nivelClase = f.nivel === 'excedido' ? 'bg-danger text-white'
-            : f.nivel === 'alerta' ? 'bg-warning text-dark' : 'bg-light';
         html += `<div class="columna-franja">
             <div class="card shadow-sm border-0 mb-2 h-100">
                 <div class="card-header py-2 bg-dark text-white">
@@ -336,16 +353,15 @@ function pintarFranjas() {
         if (!f.ocupan.length) {
             html += '<p class="text-muted small text-center mb-0 py-2">Sin reservas en esta franja.</p>';
         }
-        f.ocupan.forEach(r => { html += tarjetaReserva(r); });
+        // la tarjeta completa SOLO en la franja de inicio; en las demás, línea compacta
+        f.ocupan.forEach(r => { html += r.continua ? lineaContinua(r) : tarjetaReserva(r); });
         html += `</div>
-                <div class="card-footer fila-totales ${nivelClase} py-2">
-                    <div class="row text-center">
-                        <div class="col-3"><small>pers./mesas</small><br><strong>${f.personas}/${f.mesas}</strong></div>
-                        <div class="col-3"><small>límite</small><br><strong>${f.limite_personas}/${f.limite_mesas}</strong></div>
-                        <div class="col-3"><small>libres</small><br>
-                            <strong style="${f.personas_libres < 0 || f.mesas_libres < 0 ? 'color:#dc3545;' : ''}">
-                                   ${f.personas_libres}/${f.mesas_libres}</strong></div>
-                        <div class="col-3"><small>limita</small><br><strong>${f.limita === 'mesas' ? 'mesas' : 'personas'}</strong></div>
+                <div class="card-footer fila-totales py-2">
+                    ${barraOcupacion('Personas', f.personas, f.limite_personas, f.nivel)}
+                    ${barraOcupacion('Mesas', f.mesas, f.limite_mesas, f.nivel)}
+                    <div class="small mt-1 ocupacion-resumen">
+                        Libres: <strong style="${f.personas_libres < 0 || f.mesas_libres < 0 ? 'color:#dc3545;' : ''}">${f.personas_libres}/${f.mesas_libres}</strong>
+                        · limita <strong>${f.limita === 'mesas' ? 'mesas' : 'personas'}</strong>
                     </div>
                 </div>
             </div>
@@ -354,7 +370,23 @@ function pintarFranjas() {
     contenedorFranjas.innerHTML = html;
 }
 
+/* Barra de progreso de una franja ("Personas 16/55"), coloreada por el nivel DE LA FRANJA
+   (lo calcula fn_carga_dia en SQL: aquí solo se pinta). El texto nunca se corta. */
+function barraOcupacion(etiqueta, valor, limite, nivel) {
+    const porcentaje = limite > 0 ? Math.min(100, Math.round(valor * 100 / limite)) : 100;
+    const clase = nivel === 'excedido' ? 'bg-danger'
+                : nivel === 'alerta' ? 'bg-warning'
+                : 'bg-success';
+    return `
+    <div class="barra-ocupacion">
+        <div class="d-flex justify-content-between small"><span>${etiqueta}</span><span class="text-nowrap">${valor}/${limite}</span></div>
+        <div class="progress" style="height:6px;"><div class="progress-bar ${clase}" style="width:${porcentaje}%"></div></div>
+    </div>`;
+}
+
 function tarjetaReserva(r) {
+    /* Tarjeta COMPLETA: solo en la franja donde INICIA la reserva.
+       "continua" nunca llega aquí: las franjas posteriores dibujan lineaContinua(). */
     const atrasada = r.atrasada ? 'reserva-atrasada' : '';
     const borde = r.estado === 'llego' ? 'border-success' : 'border-dark';
     let acciones = '';
@@ -370,7 +402,7 @@ function tarjetaReserva(r) {
         acciones = '<div class="small text-success mt-2"><i class="bi bi-check2-circle"></i> Ya llegó</div>';
     }
     return `
-    <div class="card card-reserva mb-2 ${borde} ${atrasada}">
+    <div class="card card-reserva mb-2 ${borde} ${atrasada}" id="res-${r.reserva_id}">
         <div class="card-body p-2">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -379,7 +411,7 @@ function tarjetaReserva(r) {
                     ${r.excede_cupo ? '<span class="badge bg-warning text-dark badge-capa" title="Fue forzada: superó el cupo">Forzada</span>' : ''}
                     <div class="small text-muted">
                         ${hora12(r.hora)} · ${r.cantidad_personas} pax
-                        ${r.continua ? '<span class="badge bg-secondary badge-capa marca-continua">continúa</span>' : ''}
+                        ${r.hasta ? '· hasta ' + hora12(r.hasta) : ''}
                         ${r.nota ? '<br><i class="bi bi-chat-left-text"></i> ' + esc(r.nota) : ''}
                     </div>
                 </div>
@@ -391,6 +423,24 @@ function tarjetaReserva(r) {
             ${acciones}
         </div>
     </div>`;
+}
+
+/* Línea COMPACTA en las franjas posteriores (la reserva ya empezó antes):
+   sin botones ni datos repetidos; al tocarla resalta la tarjeta original. */
+function lineaContinua(r) {
+    return `
+    <div class="linea-continua" onclick="resaltarReserva(${r.reserva_id})"
+         title="Empezó a las ${hora12(r.hora)} · toque para ir a su tarjeta">
+        ↳ ${esc(r.cliente_nombre)} · ${r.cantidad_personas} pax · continúa
+    </div>`;
+}
+
+function resaltarReserva(id) {
+    const tarjeta = document.getElementById('res-' + id);
+    if (!tarjeta) return;
+    tarjeta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    tarjeta.classList.add('resalta-flash');
+    setTimeout(() => tarjeta.classList.remove('resalta-flash'), 1600);
 }
 
 /* Menú ⋮: WhatsApp, Llamar, Correo (si hay), Ver detalle, Cambiar hora, Imprimir */
