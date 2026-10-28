@@ -3,6 +3,14 @@
  * Manejo de eventos de red y comportamiento sin conexión (AGENTS.md sección 11).
  */
 
+/* Escape de HTML para insertar datos del servidor con seguridad en innerHTML.
+   Definido AQUI una sola vez: main.js se carga en todas las páginas (base.html). */
+function esc(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto == null ? '' : String(texto);
+    return div.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const bannerSinConexion = document.getElementById('banner-sin-conexion');
     const elementosConexion = document.querySelectorAll('[data-requiere-conexion]');

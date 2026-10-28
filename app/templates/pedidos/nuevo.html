@@ -69,7 +69,15 @@
 <script>
 /* Nuevo pedido en local: se buscan platos con la API de la carta y se arma el pedido.
    El precio SIEMPRE lo manda el servidor (se copia del plato): aquí solo se muestra. */
-const CSRF_N = document.querySelector('meta[name="csrf-token"]').content;
+
+/* CSRF: la página necesita su token; si falta, no operar a ciegas */
+const metaCsrfN = document.querySelector('meta[name="csrf-token"]');
+if (!metaCsrfN) {
+    document.body.insertAdjacentHTML('afterbegin',
+        '<div class="alert alert-danger m-3">Falta el token de seguridad de la página. '
+        + 'Recargue con Ctrl+F5; si sigue igual, avise al encargado del sistema.</div>');
+}
+const CSRF_N = metaCsrfN ? metaCsrfN.content : '';
 const lineas = [];   // {plato_id, nombre, precio, cantidad}
 
 const entrada = document.getElementById('busqueda');
@@ -79,31 +87,40 @@ document.getElementById('btn-buscar').addEventListener('click', buscar);
 async function buscar() {
     const texto = entrada.value.trim();
     if (!texto) return;
-    const r = await fetch('/api/v1/platos/buscar?q=' + encodeURIComponent(texto),
-                          { headers: { 'X-CSRFToken': CSRF_N } });
-    const json = await r.json();
     const cont = document.getElementById('resultados');
-    if (!json.ok) { cont.innerHTML = '<p class="text-danger small">' + json.error.mensaje + '</p>'; return; }
-    const lista = json.datos || [];
-    if (!lista.length) {
-        cont.innerHTML = '<p class="text-muted small">Sin resultados. Pruebe con el nombre del plato, su categoría o su número.</p>';
-        return;
-    }
+    try {
+        const r = await fetch('/api/v1/platos/buscar?q=' + encodeURIComponent(texto),
+                              { headers: { 'X-CSRFToken': CSRF_N } });
+        const json = await r.json();
+        if (!json.ok) {
+            cont.innerHTML = '<p class="text-danger small">' + esc(json.error.mensaje) + '</p>';
+            return;
+        }
+        const lista = json.datos || [];
+        if (!lista.length) {
+            cont.innerHTML = '<p class="text-muted small">Sin resultados. Pruebe con el nombre del plato, su categoría o su número.</p>';
+            return;
+        }
 
-    cont.innerHTML = lista.map(p => {
-        const agotado = !p.disponible;
-        return `
-        <div class="d-flex align-items-center justify-content-between border-bottom py-1">
-            <div>
-                <strong>${esc(p.nombre)}</strong>
-                ${p.codigo ? '<span class="badge bg-secondary">N° ' + p.codigo + '</span>' : ''}
-                <span class="ms-2 text-nowrap">S/ ${parseFloat(p.precio).toFixed(2)}</span>
-                <span class="small text-muted">(${esc(p.categoria)})</span>
-            </div>
-            ${agotado ? '<span class="badge bg-danger">Agotado</span>'
-                      : `<button class="btn btn-sm btn-warning" onclick='agregar(${JSON.stringify({plato_id: p.id, nombre: p.nombre, precio: parseFloat(p.precio)})})'>Agregar</button>`}
-        </div>`;
-    }).join('');
+        cont.innerHTML = lista.map(p => {
+            const agotado = !p.disponible;
+            return `
+            <div class="d-flex align-items-center justify-content-between border-bottom py-1">
+                <div>
+                    <strong>${esc(p.nombre)}</strong>
+                    ${p.codigo ? '<span class="badge bg-secondary">N° ' + p.codigo + '</span>' : ''}
+                    <span class="ms-2 text-nowrap">S/ ${parseFloat(p.precio).toFixed(2)}</span>
+                    <span class="small text-muted">(${esc(p.categoria)})</span>
+                </div>
+                ${agotado ? '<span class="badge bg-danger">Agotado</span>'
+                          : `<button class="btn btn-sm btn-warning" onclick='agregar(${JSON.stringify({plato_id: p.id, nombre: p.nombre, precio: parseFloat(p.precio)})})'>Agregar</button>`}
+            </div>`;
+        }).join('');
+    } catch (error) {
+        // fallo de red o del servidor: mensaje claro en vez de fallar en silencio
+        cont.innerHTML = '<p class="text-danger small">No se pudo hacer la búsqueda. '
+            + 'Verifique su conexión e intente de nuevo.</p>';
+    }
 }
 
 function agregar(linea) {

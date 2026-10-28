@@ -113,7 +113,7 @@ function tarjetaPedido(p, esPendiente) {
     const cliente = p.cliente_nombre
         ? `<strong>${esc(p.cliente_nombre)}</strong><div class="small"><i class="bi bi-telephone"></i> ${esc(p.cliente_telefono || '')}</div>`
         : (p.tipo === 'local' && p.mesa_referencia
-            ? `<strong>Mesa: ${esc(p.mesa_referencia)}</strong>`
+            ? `<strong>${esc(p.mesa_referencia)}</strong>`
             : '<strong>Cliente del local</strong>');
 
     let acciones = '';
@@ -261,12 +261,6 @@ function sonarQ() {
     setTimeout(() => osc.stop(), 350);
 }
 
-/* ------------------------- utilidades ------------------------- */
-function esc(t) {
-    const d = document.createElement('div');
-    d.textContent = t == null ? '' : String(t);
-    return d.innerHTML;
-}
 function horaCorta(iso) {
     return iso ? iso.substring(11, 16) : '';
 }

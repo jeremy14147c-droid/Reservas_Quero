@@ -318,12 +318,6 @@ function pintarPendientes() {
     panelPendientes.innerHTML = html;
 }
 
-function esc(texto) {
-    const div = document.createElement('div');
-    div.textContent = texto == null ? '' : String(texto);
-    return div.innerHTML;
-}
-
 /* ---------------- columnas por franja ---------------- */
 function pintarFranjas() {
     let html = '';

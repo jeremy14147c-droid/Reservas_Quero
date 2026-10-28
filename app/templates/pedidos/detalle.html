@@ -94,8 +94,8 @@
                             </li>
                         {% endif %}
                     </ul>
-                {% elif pedido.mesa_referencia and pedido.tipo == 'local' %}
-                    <p><span class="text-muted">Mesa/Fuente:</span> <strong>{{ pedido.mesa_referencia }}</strong></p>
+                {% elif pedido.tipo == 'local' and pedido.mesa_referencia %}
+                    <p><span class="text-muted">Mesa:</span> <strong>{{ pedido.mesa_referencia }}</strong></p>
                 {% endif %}
 
                 {% if pedido.nota %}<p><span class="text-muted">Nota:</span> {{ pedido.nota }}</p>{% endif %}
