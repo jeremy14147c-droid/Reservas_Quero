@@ -463,16 +463,18 @@ def obtener_pizarra(fecha):
     - ocupan: reservas confirmadas/llego que cubren cada franja (con marca 'continúa')
     - pendientes: solicitudes de la web (aparte; no ocupan franjas)
     - atrasadas: confirmadas pasadas de hora + tolerancia (solo alerta visual)
+    La duración de CADA reserva sale de fn_duracion_estadia (SQL): no se calcula en Python.
     """
     config = obtener_config()
     franjas_sql = carga_dia(fecha)
     tolerancia = timedelta(minutes=config["tolerancia_min"])
-    duracion = timedelta(minutes=config["duracion_estadia_min"])
     ahora = ahora_local()
 
     reservas_del_dia = consultar_todos(
         """SELECT r.reserva_id, r.codigo, r.cliente_id, r.fecha, r.hora, r.hora_anterior,
                   r.cantidad_personas, r.estado, r.canal, r.excede_cupo, r.nota, r.motivo,
+                  fn_duracion_estadia(r.cantidad_personas) AS duracion_min,
+                  (r.hora + make_interval(mins => fn_duracion_estadia(r.cantidad_personas)))::time AS hasta,
                   c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
                   c.correo AS cliente_correo
            FROM reserva r JOIN cliente c ON r.cliente_id = c.cliente_id
@@ -514,7 +516,8 @@ def obtener_pizarra(fecha):
         ocupan_esta = []
         for r in ocupadas:
             inicio_reserva = _fecha_hora(r)
-            fin_reserva = inicio_reserva + duracion
+            # la ocupación de mesa dura lo que manda fn_duracion_estadia (columna duracion_min del SELECT)
+            fin_reserva = inicio_reserva + timedelta(minutes=r["duracion_min"])
             if inicio_reserva < fin and fin_reserva > ini:
                 r = dict(r)
                 r["continua"] = inicio_reserva < ini  # empezó en una franja anterior
