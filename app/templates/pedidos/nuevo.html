@@ -183,7 +183,6 @@ document.getElementById('btn-enviar').addEventListener('click', async () => {
         location.href = '/staff/pedido/' + json.datos.pedido_id;
         return;
     }
-    const aviso = document.getElementById('error-crear');
     aviso.textContent = json.error.mensaje;
     aviso.classList.remove('d-none');
 });
