@@ -62,4 +62,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!navigator.onLine) {
         actualizarEstadoRed(false);
     }
+
+    // Inicializar tooltips de Bootstrap (etiquetas flotadas de botones desactivados, etc.)
+    if (window.bootstrap) {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            .forEach(el => new bootstrap.Tooltip(el));
+    }
 });
