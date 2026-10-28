@@ -60,6 +60,7 @@ quero/
 │   ├── notificaciones/      # (proyecto final) correo, enlaces de WhatsApp, plantillas de mensajes
 │   ├── templates/  static/
 │   └── utils.py             # normalizar teléfono, generar códigos, formateo
+├── migraciones/             # scripts SQL repetibles para bases ya creadas (NNN_nombre.sql)
 ├── tests/
 └── manage.py                # comandos: init-db, cargar-ejemplo, crear-admin
 ```
@@ -95,7 +96,9 @@ quero/
 - Estados: `pendiente` → `confirmada` | `rechazada` | `cancelada`; `confirmada` → `llego` | `no_llego` | `cancelada`.
   Los estados finales no cambian.
 - Reserva pedida por la web nace `pendiente` (NO cuenta para la capacidad). Reserva creada por el staff nace `confirmada`.
-- Capacidad: cuentan solo `confirmada` y `llego`. Cada reserva ocupa mesa durante `duracion_estadia_min`.
+- Capacidad: cuentan solo `confirmada` y `llego`. **Cada reserva ocupa mesa un tiempo que depende de su tamaño**:
+  de 1 a 3 personas `duracion_1_3_min` (30), de 4 a 7 `duracion_4_7_min` (60), de 8 en adelante `duracion_8_mas_min` (90),
+  todos en `config_local`. La duración sale de la función SQL `fn_duracion_estadia(personas)`; no recalcular en Python.
   Mesas requeridas = personas / `personas_por_mesa`, redondeado hacia arriba (un grupo de 2 usa una mesa entera).
   Usar las funciones `fn_carga_dia` y `fn_hay_cupo` de `schema.sql`; no reimplementar esa lógica en Python.
 - `porcentaje_reservable` limita cuánto del local pueden ocupar las reservas (el resto queda para walk-in). NULL = 100 %.
@@ -137,7 +140,10 @@ quero/
 - **Pedido `recojo`:** el staff revisa disponibilidad ANTES de cobrar. Puede quitar o ajustar líneas mientras está `pendiente`.
   Al aceptar, el monto queda fijo (el detalle ya no se edita). Rechazar exige `motivo_rechazo`.
 - **Pago:** se registra en la tabla `pago` (monto, medio, referencia). Lo confirma SIEMPRE el staff, mirando el Yape/Plin real.
-  Nunca confiar en capturas subidas por el cliente. No permitir pagar más que el total. `cobrado` sale de `v_pedido_resumen`.
+  El cliente puede adjuntar una captura de su pago como APOYO (tabla `comprobante_pago`), pero la captura nunca aprueba el pago ni
+  mueve el pedido sola: puede estar editada. El staff abre su Yape, comprueba que llegó el monto exacto y recién ahí confirma.
+  Confirmar = un solo botón, sin escribir el medio (se deduce: Yape si hay comprobante, efectivo si cobra en caja).
+  No permitir pagar más que el total. `cobrado` sale de `v_pedido_resumen`.
 - Un pedido `recojo` aceptado pasa a `en_preparacion` (cocina) solo cuando queda cobrado.
   Un pedido `local` creado por el staff nace `en_preparacion` y puede cobrarse en cualquier momento.
 - `precio_venta` se copia del `precio` del plato al crear la línea. No se puede pedir un plato con `disponible = FALSE` o `activo = FALSE`.
@@ -150,6 +156,9 @@ quero/
   (datos Yape de `config_local`) cuando está `aceptado` y por cobrar.
 - **Cocina:** cada pedido en preparación muestra el tiempo transcurrido desde `preparacion_en`. Si supera `umbral_preparacion_min` de `config_local`,
   se resalta en rojo (solo visual; no cambia su estado).
+- **Orden en cocina:** en las columnas "En cocina" y "Listos" y en el tablero de cocina, los pedidos `recojo` van PRIMERO (el cliente espera afuera
+  o avisa su llegada) y luego los `local`, cada grupo por hora de llegada. En "Pendientes" y "Por cobrar" el orden sigue siendo por llegada.
+- **Mesa:** `mesa_referencia` es siempre opcional. Mostrarla solo si existe, sin repetir el texto ("Mesa 2", no "Mesa: Mesa 2").
 
 ## 9. Contacto (MVP) y notificaciones (proyecto final)
 > **En el MVP se implementa:** el menú ⋮ de contacto (enlaces `wa.me`, `tel:` y `mailto:`, sin ninguna API) y las **alertas dentro del panel**
@@ -185,9 +194,11 @@ quero/
 ## 11. Interfaz
 - Español de Perú, moneda **S/**, fechas `dd/mm/aaaa`, horas en formato 12 h con am/pm, zona `America/Lima`.
 - Mobile-first: las pantallas del staff se usan en celular o tablet. Botones grandes, pocas acciones por pantalla.
-- Pizarra digital del día (reservas): columnas por franja horaria con las reservas que ocupan esa franja (las que continúan desde
-  antes se marcan "continúa"), y una fila final con personas, mesas, libres y cuál limita (`fn_carga_dia`), coloreada según `nivel` (alerta / excedido). Las reservas con `excede_cupo` llevan una marca visible. Las solicitudes
-  `pendiente` van en un panel aparte, no en las columnas.
+- Pizarra digital del día (reservas): una columna por franja horaria. **Cada reserva se dibuja completa SOLO en su franja de inicio**
+  (nombre, código, personas, hora, hasta qué hora ocupa mesa, botones). En las franjas siguientes se muestra una línea compacta y apagada
+  ("↳ Matías · 8 pax · continúa") sin botones; al tocarla se resalta la tarjeta original. La fila final de cada franja usa barras de progreso
+  ("Personas 16/55", "Mesas 4/15") coloreadas según `nivel` (alerta / excedido) y muestra cuál recurso limita, con texto que no se corte en celular.
+  Las reservas con `excede_cupo` llevan una marca visible. Las solicitudes `pendiente` van en un panel aparte.
 - Los tableros se refrescan solos cada ~10 s con `fetch` (sin WebSockets).
 - **Cocina (estilo Kanban):** tarjetas por pedido con temporizador; resaltado en rojo al superar `umbral_preparacion_min`; botón "Listo".
 - **Alertas en el panel:** insignia con las solicitudes o pedidos nuevos y un sonido OPCIONAL. Los navegadores exigen un toque del usuario antes de
@@ -199,6 +210,8 @@ quero/
 ## 12. Seguridad (obligatorio)
 Consultas SIEMPRE parametrizadas · CSRF en todos los formularios · contraseñas con hash · autoescape de Jinja activo ·
 validar todo en el servidor · tokens UUID en URLs públicas · formularios públicos con campo trampa (honeypot) · sin secretos en el repo.
+Subidas de archivos: máximo 5 MB; aceptar solo imágenes JPEG, PNG o WebP verificadas por su contenido real (no por la extensión);
+reconvertirlas y quitarles los metadatos; guardarlas en la base de datos (columna BYTEA), nunca en el disco ni en `static/`; los comprobantes solo los puede ver el staff y se borran pasados 30 días del cierre del pedido.
 
 ## 13. Fuera de alcance del MVP (no implementar)
 Ingresos y egresos, trabajadores y sueldos, delivery, reportes, lista de espera walk-in por QR, tabla de mesas físicas,
@@ -209,6 +222,6 @@ recepción de reservas por WhatsApp, modo sin conexión, cuentas de cliente y ap
 1. Antes de programar cada fase: presenta un plan de implementación y espera aprobación.
 2. Haz commits pequeños y descriptivos, uno por funcionalidad.
 3. Al terminar cada fase: levanta la app, **prueba los flujos en el navegador** y reporta qué funciona, qué falta y qué dudas quedan.
-4. No modifiques `schema.sql` sin avisar; si hace falta un cambio, propónlo como un script aparte.
+4. Los cambios de base de datos se hacen en scripts repetibles dentro de `migraciones/` y, en las fases que lo indiquen explícitamente, también en `schema.sql`.
 5. Comentarios en español, nombres de variables y funciones en español claro, sin abreviaturas raras.
 6. Si algo no está definido aquí, **pregunta o propón una opción**; no inventes reglas del negocio.
