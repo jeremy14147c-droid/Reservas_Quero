@@ -37,12 +37,22 @@ def actualizar_config_local(datos):
     except (TypeError, ValueError):
         raise ValueError("Personas por mesa debe ser un número entero positivo.")
 
-    try:
-        duracion_estadia = int(datos.get("duracion_estadia_min", 0))
-        if duracion_estadia <= 0:
-            raise ValueError("La duración de estadía debe ser mayor a 0 minutos.")
-    except (TypeError, ValueError):
-        raise ValueError("La duración de estadía debe ser un número entero positivo.")
+    # Duración de estadía según el tamaño del grupo (3 valores, múltiplos de 5 minutos)
+    duraciones = {}
+    for campo, etiqueta in (
+        ("duracion_1_3_min", "duración de grupos de 1 a 3 personas"),
+        ("duracion_4_7_min", "duración de grupos de 4 a 7 personas"),
+        ("duracion_8_mas_min", "duración de grupos de 8 o más personas"),
+    ):
+        try:
+            valor = int(datos.get(campo, 0))
+        except (TypeError, ValueError):
+            raise ValueError(f"La {etiqueta} debe ser un número entero positivo (múltiplo de 5).")
+        if valor <= 0:
+            raise ValueError(f"La {etiqueta} debe ser mayor a 0 minutos.")
+        if valor % 5 != 0:
+            raise ValueError(f"La {etiqueta} debe ser un múltiplo de 5 minutos.")
+        duraciones[campo] = valor
 
     try:
         franja = int(datos.get("franja_min", 30))
@@ -118,7 +128,9 @@ def actualizar_config_local(datos):
             aforo_personas = %s,
             total_mesas = %s,
             personas_por_mesa = %s,
-            duracion_estadia_min = %s,
+            duracion_1_3_min = %s,
+            duracion_4_7_min = %s,
+            duracion_8_mas_min = %s,
             franja_min = %s,
             tolerancia_min = %s,
             umbral_preparacion_min = %s,
@@ -139,7 +151,9 @@ def actualizar_config_local(datos):
             aforo,
             total_mesas,
             personas_por_mesa,
-            duracion_estadia,
+            duraciones["duracion_1_3_min"],
+            duraciones["duracion_4_7_min"],
+            duraciones["duracion_8_mas_min"],
             franja,
             tolerancia,
             umbral_prep,

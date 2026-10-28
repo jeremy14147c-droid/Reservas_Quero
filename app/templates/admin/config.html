@@ -93,10 +93,22 @@
                             <div class="form-text">Límite de atención del día.</div>
                         </div>
                         <div class="col-md-3">
-                            <label for="duracion_estadia_min" class="form-label fw-semibold">Duración de Estadía (min)</label>
-                            <input type="number" min="15" step="15" class="form-control" id="duracion_estadia_min" name="duracion_estadia_min"
-                                   value="{{ config.duracion_estadia_min }}" required>
-                            <div class="form-text">Tiempo que una reserva ocupa mesa (ej. 90 min).</div>
+                            <label for="duracion_1_3_min" class="form-label fw-semibold">Duración en Mesa: 1–3 pax (min)</label>
+                            <input type="number" min="5" step="5" class="form-control" id="duracion_1_3_min" name="duracion_1_3_min"
+                                   value="{{ config.duracion_1_3_min }}" required>
+                            <div class="form-text">Tiempo de mesa de grupos de 1 a 3 personas (ej. 30 min).</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="duracion_4_7_min" class="form-label fw-semibold">Duración: 4–7 pax (min)</label>
+                            <input type="number" min="5" step="5" class="form-control" id="duracion_4_7_min" name="duracion_4_7_min"
+                                   value="{{ config.duracion_4_7_min }}" required>
+                            <div class="form-text">Tiempo de mesa de grupos de 4 a 7 personas (ej. 60 min).</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="duracion_8_mas_min" class="form-label fw-semibold">Duración: 8 o más (min)</label>
+                            <input type="number" min="5" step="5" class="form-control" id="duracion_8_mas_min" name="duracion_8_mas_min"
+                                   value="{{ config.duracion_8_mas_min }}" required>
+                            <div class="form-text">Tiempo de mesa de grupos grandes, 8 en adelante (ej. 90 min).</div>
                         </div>
                         <div class="col-md-3">
                             <label for="franja_min" class="form-label fw-semibold">Franja Horaria (min)</label>
