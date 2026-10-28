@@ -17,16 +17,15 @@
         {% endif %}
 
         <div class="d-grid gap-3 d-sm-flex justify-content-sm-center mt-3">
-            <button class="btn btn-warning btn-lg px-4 gap-3 btn-lg-mobile fw-bold shadow-sm" data-requiere-conexion>
+            <a class="btn btn-warning btn-lg px-4 gap-3 btn-lg-mobile fw-bold shadow-sm" href="{{ url_for('publico.reservar') }}">
                 <i class="bi bi-calendar-check me-2"></i> Reservar Mesa
-            </button>
-            <button class="btn btn-outline-dark btn-lg px-4 btn-lg-mobile fw-bold shadow-sm" data-requiere-conexion>
+            </a>
+            <!-- El pedido por la web se activa con la Fase 3; por ahora no hace nada -->
+            <a class="btn btn-outline-dark btn-lg px-4 btn-lg-mobile fw-bold shadow-sm disabled" aria-disabled="true"
+               data-bs-toggle="tooltip" data-bs-title="Habilitaremos los pedidos por la web muy pronto">
                 <i class="bi bi-bag-check me-2"></i> Hacer Pedido
-            </button>
+            </a>
         </div>
-        <small class="text-muted d-block mt-3">
-            * Los botones de reservar y pedir se habilitarán en las siguientes fases.
-        </small>
     </div>
 </div>
 {% endblock %}

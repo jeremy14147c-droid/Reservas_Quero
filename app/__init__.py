@@ -7,6 +7,7 @@ from app.config import Config
 from app.db import cerrar_db
 from app.auth.usuario import cargar_usuario, obtener_usuario_actual
 from app.api.helpers import respuesta_error
+from app.utils import formato_hora_12h, formato_fecha_ddmm
 
 # Extensiones globales
 login_manager = LoginManager()
@@ -35,7 +36,9 @@ def create_app(config_class=Config):
     @app.context_processor
     def inyectar_contexto():
         return {
-            "usuario_actual": obtener_usuario_actual()
+            "usuario_actual": obtener_usuario_actual(),
+            "utils_hora12": formato_hora_12h,
+            "utils_fecha": formato_fecha_ddmm
         }
 
     # Registrar blueprints
