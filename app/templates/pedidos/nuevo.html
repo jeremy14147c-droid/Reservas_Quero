@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nuevo pedido en local - Staff{% endblock %}
+
+{% block contenido %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<h2 class="fw-bold mb-1"><i class="bi bi-plus-circle text-warning me-2"></i>Nuevo pedido en local</h2>
+<p class="text-muted small">Nace <strong>en_preparación</strong>: se puede cobrar en cualquier momento (antes de la entrega).</p>
+
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+
+                <!-- Búsqueda de platos (usa /api/v1/platos/buscar: nombre, categoría o Número exacto) -->
+                <label class="form-label fw-semibold">Buscar plato (nombre, categoría o número)</label>
+                <div class="input-group mb-3">
+                    <input type="text" id="busqueda" class="form-control"
+                           placeholder="Ej. ceviche, mariscos, o el número 12..."
+                           autocomplete="off">
+                    <button class="btn btn-outline-dark" type="button" id="btn-buscar">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                <div id="resultados" class="mb-4"></div>
+
+                <!-- Líneas del pedido -->
+                <label class="form-label fw-semibold">Pedido (<span id="conteo">0</span> platos)</label>
+                <div id="carrito" class="alert alert-light border py-2 small text-muted">Sin platos todavía.</div>
+
+                <!-- Datos -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small">Cliente (opcional)</label>
+                        <input type="text" id="nombre" class="form-control" maxlength="100" placeholder="Si lo conoce">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Teléfono (solo si registró cliente)</label>
+                        <input type="tel" id="telefono" class="form-control" maxlength="9" inputmode="numeric" placeholder="9...">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Mesa / Fuente (texto)</label>
+                        <input type="text" id="mesa" class="form-control" maxlength="20" placeholder="Ej. Mesa 3, barra">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Nota para cocina</label>
+                    <textarea id="nota" class="form-control" rows="2" maxlength="300"></textarea>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Total: S/ <span id="total">0.00</span></h5>
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('pedidos.cola') }}" class="btn btn-secondary">Cancelar</a>
+                        <button class="btn btn-warning btn-lg fw-bold" id="btn-enviar" data-requiere-conexion>
+                            <i class="bi bi-fire me-1"></i> Crear y mandar a cocina
+                        </button>
+                    </div>
+                </div>
+                <div class="alert alert-danger py-2 small mt-2 d-none" id="error-crear"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Nuevo pedido en local: se buscan platos con la API de la carta y se arma el pedido.
+   El precio SIEMPRE lo manda el servidor (se copia del plato): aquí solo se muestra. */
+const CSRF_N = document.querySelector('meta[name="csrf-token"]').content;
+const lineas = [];   // {plato_id, nombre, precio, cantidad}
+
+const entrada = document.getElementById('busqueda');
+entrada.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); buscar(); } });
+document.getElementById('btn-buscar').addEventListener('click', buscar);
+
+async function buscar() {
+    const texto = entrada.value.trim();
+    if (!texto) return;
+    const r = await fetch('/api/v1/platos/buscar?q=' + encodeURIComponent(texto),
+                          { headers: { 'X-CSRFToken': CSRF_N } });
+    const json = await r.json();
+    const cont = document.getElementById('resultados');
+    if (!json.ok) { cont.innerHTML = '<p class="text-danger small">' + json.error.mensaje + '</p>'; return; }
+    const lista = json.datos || [];
+    if (!lista.length) {
+        cont.innerHTML = '<p class="text-muted small">Sin resultados. Pruebe con el nombre del plato, su categoría o su número.</p>';
+        return;
+    }
+
+    cont.innerHTML = lista.map(p => {
+        const agotado = !p.disponible;
+        return `
+        <div class="d-flex align-items-center justify-content-between border-bottom py-1">
+            <div>
+                <strong>${esc(p.nombre)}</strong>
+                ${p.codigo ? '<span class="badge bg-secondary">N° ' + p.codigo + '</span>' : ''}
+                <span class="ms-2 text-nowrap">S/ ${parseFloat(p.precio).toFixed(2)}</span>
+                <span class="small text-muted">(${esc(p.categoria)})</span>
+            </div>
+            ${agotado ? '<span class="badge bg-danger">Agotado</span>'
+                      : `<button class="btn btn-sm btn-warning" onclick='agregar(${JSON.stringify({plato_id: p.id, nombre: p.nombre, precio: parseFloat(p.precio)})})'>Agregar</button>`}
+        </div>`;
+    }).join('');
+}
+
+function agregar(linea) {
+    const existente = lineas.find(l => l.plato_id === linea.plato_id);
+    if (existente) existente.cantidad += 1;
+    else lineas.push({ ...linea, cantidad: 1 });
+    pintarCarrito();
+}
+
+function pintarCarrito() {
+    const cont = document.getElementById('carrito');
+    let total = 0, cantidad = 0;
+    if (!lineas.length) {
+        cont.innerHTML = 'Sin platos todavía.';
+    } else {
+        cont.innerHTML = lineas.map((l, i) => {
+            const importe = l.precio * l.cantidad;
+            total += importe; cantidad += l.cantidad;
+            return `<div class="d-flex align-items-center gap-2 py-1 border-bottom">
+                <span class="flex-grow-1 text-dark">${esc(l.nombre)}</span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="cambia(${i}, -1)">−</button>
+                <span class="px-2">${l.cantidad}</span>
+                <button class="btn btn-sm btn-outline-secondary" onclick="cambia(${i}, +1)">+</button>
+                <span class="text-nowrap">S/ ${importe.toFixed(2)}</span>
+                <button class="btn btn-sm btn-outline-danger" onclick="quita(${i})">✕</button>
+            </div>`;
+        }).join('');
+    }
+    document.getElementById('total').textContent = total.toFixed(2);
+    document.getElementById('conteo').textContent = cantidad;
+}
+
+function cambia(i, delta) {
+    lineas[i].cantidad = Math.max(1, lineas[i].cantidad + delta);
+    pintarCarrito();
+}
+function quita(i) { lineas.splice(i, 1); pintarCarrito(); }
+
+document.getElementById('btn-enviar').addEventListener('click', async () => {
+    const aviso = document.getElementById('error-crear');
+    if (!lineas.length) {
+        aviso.textContent = 'Agregue al menos un plato.';
+        aviso.classList.remove('d-none');
+        return;
+    }
+    const cuerpo = {
+        nombre: document.getElementById('nombre').value.trim(),
+        telefono: document.getElementById('telefono').value.trim(),
+        mesa_referencia: document.getElementById('mesa').value.trim(),
+        nota: document.getElementById('nota').value.trim(),
+        items: lineas.map(l => ({ plato_id: l.plato_id, cantidad: l.cantidad }))
+    };
+    const r = await fetch('/api/v1/pedidos/local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_N },
+        body: JSON.stringify(cuerpo)
+    });
+    const json = await r.json();
+    if (json.ok) {
+        location.href = '/staff/pedido/' + json.datos.pedido_id;
+        return;
+    }
+    const aviso = document.getElementById('error-crear');
+    aviso.textContent = json.error.mensaje;
+    aviso.classList.remove('d-none');
+});
+</script>
+{% endblock %}

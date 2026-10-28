@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block titulo %}Cocina - Staff{% endblock %}
+
+{% block estilos %}
+<style>
+    .card-cocina { border-left: 5px solid #198754; }
+    .card-atrasada { border-left-color: #dc3545; background-color: #f8d7da; }
+    .timer-grande { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+    .linea-kitchen { border-bottom: 1px dashed #ccc; }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-0"><i class="bi bi-fire text-danger me-2"></i>Cocina</h2>
+        <p class="text-muted small mb-0">Pedidos en preparación por orden de entrada. Rojo al superar {{ umbral_min }} min.</p>
+    </div>
+    <button id="btn-sonido" class="btn btn-outline-secondary btn-sm"><i class="bi bi-volume-mute me-1"></i> Activar sonido</button>
+</div>
+
+<!-- Los pedidos listos (por si el navegador duerme) -->
+<div id="zona-listos" class="mb-3"></div>
+
+<div id="tarjetas-cocina" class="row g-2"></div>
+<p id="sin-cocina" class="text-muted text-center py-4">Sin pedidos en cocina por ahora.</p>
+
+<div id="toast-aviso" class="alert alert-success py-2 px-3 shadow-lg position-fixed bottom-0 end-0 m-3 d-none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Tablero de cocina: GET /api/v1/pedidos/cocina cada 10 s.
+   - Temporizador visual desde preparacion_en (se recalcula cada segundo).
+   - Rojo (solo visual) cuando pasa el umbral.
+   - Screen Wake Lock: pide que la pantalla no se apague (si el navegador lo permite). */
+const CSRF_K = document.querySelector('meta[name="csrf-token"]').content;
+const UMBRAL_MIN = {{ umbral_min }};
+let wakeLock = null;
+let sonarCocina = false;
+let ctxAudio = null;
+
+document.getElementById('btn-sonido').addEventListener('click', function () {
+    sonarCocina = !sonarCocina;
+    if (sonarCocina && !ctxAudio) ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+    this.innerHTML = sonarCocina ? '<i class="bi bi-volume-up me-1"></i> Sonido activado'
+                                : '<i class="bi bi-volume-mute me-1"></i> Activar sonido';
+    this.classList.toggle('btn-success', sonarCocina);
+    this.classList.toggle('btn-outline-secondary', !sonarCocina);
+});
+
+/* Wake Lock: mantener la pantalla encendida */
+async function pedirWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => { wakeLock = null; });
+        }
+    } catch (e) { /* el navegador puede negarlo: no es crítico */ }
+}
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pedirWakeLock();
+});
+pedirWakeLock();
+
+async function apiKocina() {
+    const r = await fetch('/api/v1/pedidos/cocina', { headers: { 'X-CSRFToken': CSRF_K } });
+    const json = await r.json();
+    if (!json.ok) throw new Error(json.error ? json.error.mensaje : 'error');
+    return json.datos;
+}
+
+let pedidosActuales = [];
+
+function pintarCocina(datos) {
+    pedidosActuales = datos.pedidos || [];
+    const cont = document.getElementById('tarjetas-cocina');
+    document.getElementById('sin-cocina').style.display = pedidosActuales.length ? 'none' : 'block';
+
+    cont.innerHTML = pedidosActuales.map(p => {
+        const lineaLista = (p.lineas || []).map(l =>
+            `<div class="linea-kitchen"><strong>${l.cantidad}</strong> × ${l.nombre}
+                ${l.nota ? '<span class="text-muted small">(' + l.nota + ')</span>' : ''}</div>`).join('');
+        const tipoMarca = p.tipo === 'recojo' ? '<span class="badge bg-warning text-dark">Recojo</span>'
+                                              : '<span class="badge bg-primary">Local</span>';
+        return `
+        <div class="col-12 col-md-6 col-xl-4">
+            <div class="card mb-2 card-cocina ${p.atrasado ? 'card-atrasada' : ''} shadow-sm">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>N° ${p.pedido_id}</strong> ${tipoMarca}
+                            <div class="small text-muted">${p.cliente_nombre ? esc(p.cliente_nombre) : (p.mesa_referencia ? 'Mesa ' + esc(p.mesa_referencia) : 'Cliente del local')}</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="timer-grande fw-bold ${p.atrasado ? 'text-danger' : ''}" id="timer-${p.pedido_id}">--</div>
+                            ${p.atrasado ? '<span class="badge bg-danger">¡ATRASADO!</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="mt-2">${lineaLista}</div>
+                    <button class="btn btn-success w-100 mt-3" onclick="marcarListoK(${p.pedido_id})">
+                        <i class="bi bi-check2"></i> LISTO
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+    actualizarTiempos();
+}
+
+/* Temporizador: recalculado en vivo entre recargas */
+function actualizarTiempos() {
+    const ahora = Date.now();
+    pedidosActuales.forEach(p => {
+        const el = document.getElementById('timer-' + p.pedido_id);
+        if (!el) return;
+        const inicio = p.preparacion_en ? new Date(p.preparacion_en).getTime() : ahora;
+        const min = Math.max(0, Math.floor((ahora - inicio) / 60000));
+        el.textContent = min + ' min';
+    });
+}
+setInterval(actualizarTiempos, 15000);
+
+async function refrescar() {
+    try {
+        pintarCocina(await apiKocina());
+    } catch (e) {
+        console.warn('cocina sin datos:', e.message);
+    }
+}
+
+async function marcarListoK(id) {
+    const r = await fetch('/api/v1/pedidos/' + id + '/listo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_K },
+        body: '{}'
+    });
+    const json = await r.json();
+    if (json.ok) { mostrarToast('N° ' + id + ' LISTO.'); refrescar(); }
+    else alert(json.error.mensaje);
+}
+
+function mostrarToast(texto) {
+    const toast = document.getElementById('toast-aviso');
+    toast.textContent = texto;
+    toast.classList.remove('d-none');
+    setTimeout(() => toast.classList.add('d-none'), 4000);
+}
+
+function esc(t) { const div = document.createElement('div'); div.textContent = t == null ? '' : String(t); return div.innerHTML; }
+
+refrescar();
+setInterval(refrescar, 10000);
+</script>
+{% endblock %}

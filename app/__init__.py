@@ -48,6 +48,7 @@ def create_app(config_class=Config):
     from app.reservas import reservas_bp
     from app.carta import carta_bp
     from app.admin import admin_bp
+    from app.pedidos import pedidos_bp
 
     app.register_blueprint(publico_bp)
     app.register_blueprint(auth_bp)
@@ -55,6 +56,7 @@ def create_app(config_class=Config):
     app.register_blueprint(reservas_bp)
     app.register_blueprint(carta_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(pedidos_bp)
 
     # Manejo uniforme de errores (JSON en /api/, HTML en el resto)
     registrar_manejadores_error(app)

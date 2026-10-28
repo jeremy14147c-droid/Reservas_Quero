@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pedido N° {{ pedido.pedido_id }} - Detalle{% endblock %}
+
+{% block contenido %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="pedido-id" content="{{ pedido.pedido_id }}">
+<meta name="total" content="{{ '%.2f'|format(pedido.total|float) }}">
+<meta name="pagado" content="{{ '%.2f'|format(pedido.pagado|float) }}">
+
+<div class="row justify-content-center">
+    <div class="col-12 col-md-10 col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="fw-bold mb-0"><i class="bi bi-bag-check me-2 text-warning"></i>Pedido N° {{ pedido.pedido_id }}
+                        {% if pedido.tipo == 'recojo' %}<span class="badge bg-warning text-dark ms-1">Recojo web</span>
+                        {% else %}<span class="badge bg-primary ms-1">Local</span>{% endif %}
+                    </h5>
+                    <small class="text-white-50">Creado {{ pedido.creado_en.strftime('%d/%m/%Y %H:%M') if pedido.creado_en else '' }}</small>
+                </div>
+                <span class="badge fs-6
+                    {{ 'bg-warning text-dark' if pedido.estado == 'pendiente' else
+                       'bg-primary' if pedido.estado == 'aceptado' else
+                       'bg-success' if pedido.estado in ('en_preparacion','listo') else
+                       'bg-danger' if pedido.estado == 'rechazado' else 'bg-secondary' }}">
+                    {{ pedido.estado | replace('_', ' ') | upper }}
+                </span>
+            </div>
+            <div class="card-body p-4">
+
+                {% if pedido.estado == 'pendiente' %}
+                    <div class="alert alert-info py-2 small">
+                        <i class="bi bi-info-circle me-1"></i> Revisa <strong>disponibilidad y cantidades</strong> antes de aceptar:
+                        puedes ajustar o quitar líneas ahora. Al aceptar, el monto queda fijo.
+                    </div>
+                {% elif pedido.estado == 'aceptado' and not pedido.cobrado %}
+                    <div class="alert alert-primary py-2 small">
+                        <i class="bi bi-cash-coin me-1"></i> Aceptado y por cobrar: comprueba el pago real
+                        en Yape/Plin (o pide el efectivo) y luego registra el pago. Al quedar cobrado pasa solo a cocina.
+                    </div>
+                {% endif %}
+
+                {% if pedido.actividad_24h %}
+                    <p class="small text-info"><i class="bi bi-info-circle me-1"></i>Este cliente ya pidió o reservó hace menos de 24 h (solo aviso).</p>
+                {% endif %}
+
+                <!-- Líneas del pedido -->
+                <table class="table table-sm align-middle">
+                    <thead><tr><th>Plato</th><th class="text-center">Cant.</th><th class="text-end">Precio</th><th class="text-end">Importe</th><th></th></tr></thead>
+                    <tbody id="tabla-lineas">
+                        {% for linea in pedido.lineas %}
+                            <tr>
+                                <td>{{ linea.plato_nombre }}
+                                    {% if linea.plato_codigo %}<span class="badge bg-secondary">N° {{ linea.plato_codigo }}</span>{% endif %}
+                                    {% if linea.nota %}<div class="small text-muted"><i class="bi bi-chat-left-text"></i> {{ linea.nota }}</div>{% endif %}
+                                    {% if not linea.disponible and pedido.estado == 'pendiente' %}<span class="badge bg-danger">Agotado: quítalo o cámbialo</span>{% endif %}
+                                </td>
+                                <td class="text-center">{{ linea.cantidad }}</td>
+                                <td class="text-end">S/ {{ '%.2f'|format(linea.precio_venta|float) }}</td>
+                                <td class="text-end">S/ {{ '%.2f'|format((linea.precio_venta|float) * linea.cantidad) }}</td>
+                                <td class="text-end">
+                                    {% if pedido.estado == 'pendiente' %}
+                                        <button class="btn btn-sm btn-outline-secondary" title="Editar cantidad"
+                                                data-detalle="{{ linea.detalle_id }}" data-plato="{{ linea.plato_id }}"
+                                                data-nombre="{{ linea.plato_nombre }}" data-cant="{{ linea.cantidad }}">{{ '✎' }}</button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr><td colspan="3" class="text-muted">Total</td><td class="text-end fw-bold">S/ {{ '%.2f'|format(pedido.total|float) }}</td><td></td></tr>
+                        <tr><td colspan="3" class="text-muted">Pagado</td><td class="text-end" id="celda-pagado">S/ {{ '%.2f'|format(pedido.pagado|float) }}</td><td></td></tr>
+                        <tr><td colspan="3" class="text-muted fw-semibold">Saldo por cobrar</td><td class="text-end fw-bold text-danger" id="celda-saldo">S/ {{ '%.2f'|format((pedido.total|float) - (pedido.pagado|float)) }}</td><td></td></tr>
+                    </tfoot>
+                </table>
+
+                <!-- Cliente -->
+                {% if pedido.tipo == 'recojo' or pedido.cliente_nombre %}
+                    <ul class="list-group list-group-flush mb-2">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span class="text-muted">Cliente</span>
+                            <strong>{{ pedido.cliente_nombre or '—' }}</strong>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span class="text-muted">Teléfono</span>
+                            <strong>{{ pedido.cliente_telefono or '—' }}</strong>
+                        </li>
+                        {% if pedido.cliente_correo %}
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span class="text-muted">Correo</span>
+                                <strong>{{ pedido.cliente_correo }}</strong>
+                            </li>
+                        {% endif %}
+                    </ul>
+                {% elif pedido.mesa_referencia and pedido.tipo == 'local' %}
+                    <p><span class="text-muted">Mesa/Fuente:</span> <strong>{{ pedido.mesa_referencia }}</strong></p>
+                {% endif %}
+
+                {% if pedido.nota %}<p><span class="text-muted">Nota:</span> {{ pedido.nota }}</p>{% endif %}
+                {% if pedido.motivo_rechazo %}<p class="text-danger"><i class="bi bi-info-circle me-1"></i>Motivo: {{ pedido.motivo_rechazo }}</p>{% endif %}
+
+                <!-- Pagos registrados -->
+                {% if pedido.pagos %}
+                    <div class="card bg-light border-0 mb-2">
+                        <div class="card-body py-2">
+                            <h6 class="small text-muted mb-1">Pagos registrados</h6>
+                            {% for pago in pedido.pagos %}
+                                <div class="small">{{ pago.confirmado_en.strftime('%d/%m %H:%M') }} — <strong>{{ pago.medio | capitalize }}</strong> S/ {{ '%.2f'|format(pago.monto|float) }} {% if pago.referencia %}(Ref. {{ pago.referencia }}){% endif %}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-light d-flex flex-wrap gap-2">
+                <a href="{{ url_for('pedidos.cola') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i> Volver a la cola</a>
+                <a href="{{ url_for('pedidos.ticket', pedido_id=pedido.pedido_id) }}" target="_blank" class="btn btn-outline-dark btn-sm"><i class="bi bi-printer me-1"></i> Imprimir ticket</a>
+
+                {% if pedido.estado == 'pendiente' %}
+                    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditar"><i class="bi bi-pencil-square me-1"></i> Ajustar líneas</button>
+                    <button class="btn btn-success btn-sm" onclick="aceptarPedido({{ pedido.pedido_id }}, false)"><i class="bi bi-check2 me-1"></i> Aceptar</button>
+                    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalRechazar"><i class="bi bi-x-lg me-1"></i> Rechazar</button>
+                {% elif pedido.estado == 'aceptado' and not pedido.cobrado %}
+                    <button class="btn btn-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalPago"><i class="bi bi-cash-coin me-1"></i> Registrar pago</button>
+                {% elif pedido.estado == 'aceptado' and pedido.cobrado %}
+                    <button class="btn btn-success btn-sm" onclick="transicion({{ pedido.pedido_id }}, 'preparar')"><i class="bi bi-fire me-1"></i> Pasar a cocina</button>
+                {% elif pedido.estado == 'en_preparacion' %}
+                    <button class="btn btn-success btn-sm fw-bold" onclick="transicion({{ pedido.pedido_id }}, 'listo')"><i class="bi bi-check2 me-1"></i> Marcar LISTO</button>
+                {% elif pedido.estado == 'listo' %}
+                    <button class="btn btn-dark btn-sm fw-bold" onclick="transicion({{ pedido.pedido_id }}, 'entregar')"><i class="bi bi-box-arrow-right me-1"></i> Marcar ENTREGADO</button>
+                {% endif %}
+
+                {% if pedido.estado in ('pendiente','aceptado','en_preparacion','listo') %}
+                    <button class="btn btn-outline-danger btn-sm ms-auto" onclick="cancelarPedido({{ pedido.pedido_id }})"><i class="bi bi-slash-circle me-1"></i> Cancelar</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: ajustar líneas (solo pendiente) -->
+<div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title">Ajustar líneas del pedido</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="editar-lista">…</div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarLineas()">Guardar ajuste</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: rechazar (motivo obligatorio) -->
+<div class="modal fade" id="modalRechazar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Rechazar pedido</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-semibold">Motivo (se le informa al cliente) *</label>
+                <input type="text" id="motivo-rechazo" class="form-control" maxlength="200"
+                       placeholder="Ej. quedó cerrado el estacionamiento...">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-danger" onclick="rechazarDesdeModal()">Rechazar pedido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: registrar pago -->
+<div class="modal fade" id="modalPago" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-1"></i>Registrar pago</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-light border small">Total S/ {{ '%.2f'|format(pedido.total|float) }} · ya pagado S/ {{ '%.2f'|format(pedido.pagado|float) }} · saldo S/ {{ '%.2f'|format((pedido.total|float) - (pedido.pagado|float)) }}</div>
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Medio *</label>
+                        <select id="medio-pago" class="form-select">
+                            <option value="yape">Yape</option>
+                            <option value="plin">Plin</option>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Monto *</label>
+                        <input type="number" id="monto-pago" class="form-control" step="0.01" min="0.01"
+                               value="{{ '%.2f'|format((pedido.total|float) - (pedido.pagado|float)) }}">
+                    </div>
+                </div>
+                <label class="form-label small">Referencia (n.º de operación de Yape/Plin, opcional para efectivo)</label>
+                <input type="text" id="ref-pago" class="form-control" maxlength="60">
+                <div class="alert alert-danger py-2 small mt-2 d-none" id="error-pago"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary fw-bold" onclick="registrarPago()">Confirmar pago</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-aviso alert alert-success position-fixed bottom-0 end-0 m-3 d-none shadow-lg"></div>
+<div class="toast-error alert alert-danger position-fixed bottom-0 end-0 m-3 d-none shadow-lg"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const CSRF_D = document.querySelector('meta[name="csrf-token"]').content;
+    const PEDIDO_ID = parseInt(document.querySelector('meta[name="pedido-id"]').content, 10);
+
+    async function accionD(url, cuerpo = {}) {
+        const respuesta = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_D },
+            body: JSON.stringify(cuerpo)
+        });
+        const datos = await respuesta.json();
+        if (!datos.ok) {
+            alert(datos.error.mensaje);
+            return null;
+        }
+        location.reload();
+        return datos;
+    }
+
+    function aceptarPedido(id) { accionD('/api/v1/pedidos/' + id + '/aceptar'); }   // recarga y el modal de pago aparece en el nuevo estado
+    function rechazarDesdeModal() {
+        const motivo = document.getElementById('motivo-rechazo').value.trim();
+        if (!motivo) { alert('El motivo es obligatorio.'); return; }
+        bootstrap.Modal.getInstance(document.getElementById('modalRechazar')).hide();
+        accionD('/api/v1/pedidos/' + PEDIDO_ID + '/rechazar', { motivo: motivo });
+    }
+    function rechazarPedido(id) {
+        const motivo = prompt('Motivo del rechazo (obligatorio):');
+        if (motivo && motivo.trim()) accionD('/api/v1/pedidos/' + id + '/rechazar', { motivo: motivo.trim() });
+    }
+    function cancelarPedido(id) {
+        if (confirm('¿Cancelar este pedido?')) accionD('/api/v1/pedidos/' + id + '/cancelar');
+    }
+    function transicion(id, accion) { accionD('/api/v1/pedidos/' + id + '/' + accion); }
+
+    /* Registrar pago */
+    function registrarPago() {
+        const cuerpo = {
+            medio: document.getElementById('medio-pago').value,
+            monto: document.getElementById('monto-pago').value,
+            referencia: document.getElementById('ref-pago').value.trim()
+        };
+        accionD('/api/v1/pedidos/' + PEDIDO_ID + '/pagar', cuerpo);
+    }
+
+    /* Ajustar líneas (solo mientras está pendiente) */
+    {% if pedido.estado == 'pendiente' %}
+    function leerFilas() {
+        return JSON.parse(document.getElementById('editar-lista').dataset.payload || '[]');
+    }
+    function pintarEditar(filas) {
+        document.getElementById('editar-lista').dataset.payload = JSON.stringify(filas);
+        const cont = document.getElementById('editar-lista');
+        if (!filas.length) {
+            cont.innerHTML = '<p class="text-danger small">Quedó sin platos: agregue todos o rechace el pedido.</p>';
+            return;
+        }
+        cont.innerHTML = filas.map((f, i) =>
+            `<div class="d-flex align-items-center gap-2 mb-2">
+                <span class="flex-grow-1">${f.nombre}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="quitarFila(${i})">✕</button>
+                <input type="number" class="form-control form-control-sm" style="max-width:80px" min="1" max="99"
+                       value="${f.cantidad}" data-i="${i}">
+             </div>`).join('');
+    }
+    function cargarEditar() {
+        const filas = [];
+        document.querySelectorAll('#tabla-lineas tbody tr').forEach(tr => {
+            const btn = tr.querySelector('[data-plato]');
+            filas.push({
+                plato_id: parseInt(btn.dataset.plato, 10),
+                nombre: btn.dataset.nombre,
+                cantidad: parseInt(btn.dataset.cant, 10)
+            });
+        });
+        pintarEditar(filas);
+    }
+    function quitarFila(i) {
+        const filas = leerFilas();
+        filas.splice(i, 1);
+        pintarEditar(filas);
+    }
+    function guardarLineas() {
+        const cont = document.getElementById('editar-lista');
+        const filas = leerFilas();
+        // cantidades leidas de los inputs, en el mismo orden
+        cont.querySelectorAll('input[type=number]').forEach((inp, i) => {
+            filas[i].cantidad = parseInt(inp.value, 10) || 1;
+        });
+        if (!filas.length) { alert('Agregue todos o rechace el pedido.'); return; }
+        const items = filas.map(f => ({ plato_id: f.plato_id, cantidad: f.cantidad }));
+        const r = accionD('/api/v1/pedidos/' + PEDIDO_ID + '/actualizar-lineas', { items: items });
+        if (r) bootstrap.Modal.getInstance(document.getElementById('modalEditar')).hide();
+    }
+    // el modal se llena cuando se abre
+    document.getElementById('modalEditar').addEventListener('show.bs.modal', cargarEditar);
+    {% endif %}
+</script>
+{% endblock %}

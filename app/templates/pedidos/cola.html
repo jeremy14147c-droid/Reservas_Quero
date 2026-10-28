@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block titulo %}Cola de Pedidos - Staff{% endblock %}
+
+{% block estilos %}
+<style>
+    .card-pedido { border-left-width: 5px; }
+    .recojo { border-left-color: #ffc107; }
+    .local { border-left-color: #0d6efd; }
+    .menu-acciones .dropdown-menu { min-width: 210px; }
+</style>
+{% endblock %}
+
+{% block contenido %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold mb-0"><i class="bi bi-bag-check text-warning me-2"></i>Cola de Pedidos</h2>
+        <p class="text-muted small mb-0">Se actualiza sola cada 10 segundos. Nada entra a cocina sin pago ni acción del staff.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <span id="insignia-pendientes" class="badge bg-danger fs-6 d-none">0</span>
+        <button id="btn-sonido" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-volume-mute me-1"></i> Activar sonido
+        </button>
+        <a href="{{ url_for('pedidos.nuevo') }}" class="btn btn-warning btn-sm fw-bold">
+            <i class="bi bi-plus-circle me-1"></i> Pedido en local
+        </a>
+    </div>
+</div>
+<!-- Casilla de impresión al pasar a cocina (nivel 2; apagada por defecto) -->
+<div class="form-check form-switch small mb-2">
+    <input class="form-check-input" type="checkbox" id="imprimir-auto">
+    <label class="form-check-label" for="imprimir-auto">Imprimir al pasar a cocina
+        <span class="text-muted">(requiere la tiquetera configurada con --kiosk-printing; ver GUIA_IMPRESION)</span>
+    </label>
+</div>
+
+<!-- 4 columnas de la cola -->
+<div class="row g-2 mb-2" id="columnas-cola">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-warning border-2 h-100">
+            <div class="card-header bg-warning-subtle py-2"><strong><i class="bi bi-hourglass me-1"></i>Pendientes</strong> <span class="badge bg-warning text-dark float-end" id="n-pendientes">0</span></div>
+            <div class="card-body p-2" id="col-pendientes"></div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-dark text-white py-2"><strong><i class="bi bi-cash-coin me-1"></i>Por cobrar</strong> <span class="badge bg-light text-dark float-end" id="n-cobrar">0</span></div>
+            <div class="card-body p-2" id="col-cobrar"></div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-success text-white py-2"><strong><i class="bi bi-fire me-1"></i>En cocina</strong> <span class="badge bg-light text-dark float-end" id="n-cocina">0</span></div>
+            <div class="card-body p-2" id="col-cocina"></div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-secondary text-white py-2"><strong><i class="bi bi-check2-all me-1"></i>Listos</strong> <span class="badge bg-light text-dark float-end" id="n-listos">0</span></div>
+            <div class="card-body p-2" id="col-listos"></div>
+        </div>
+    </div>
+</div>
+<p class="text-muted small">Entregados de hoy: <span id="n-entregados">0</span></p>
+<div id="toast-aviso" class="alert alert-success py-2 px-3 shadow-lg position-fixed bottom-0 end-0 m-3 d-none"></div>
+<div id="toast-error" class="alert alert-danger py-2 px-3 shadow-lg position-fixed bottom-0 end-0 m-3 d-none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/js_pedidos.js') }}"></script>
+{% endblock %}
