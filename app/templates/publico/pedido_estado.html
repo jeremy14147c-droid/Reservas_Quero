@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mi Pedido - {{ config.nombre_local }}{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white text-center py-3">
+                <h4 class="fw-bold mb-0"><i class="bi bi-bag-check me-2 text-warning"></i>Estado de mi pedido</h4>
+                <small class="text-white-50">Recojo en {{ config.nombre_local }}</small>
+            </div>
+            <div class="card-body p-4 text-center">
+
+                {% if pedido.estado == 'pendiente' %}
+                    <div class="alert estado-grande bg-warning-subtle border-warning mb-4 py-3">
+                        <i class="bi bi-hourglass-split display-6 d-block mb-2"></i>
+                        <strong>Pendiente de revisión</strong>
+                        <p class="mb-0 small mt-1">El personal está revisando tu pedido. Te avisaremos por WhatsApp.</p>
+                    </div>
+                {% elif pedido.estado == 'aceptado' %}
+                    <div class="alert estado-grande bg-primary-subtle border-primary mb-4 py-3">
+                        <i class="bi bi-cash-coin display-6 d-block mb-2"></i>
+                        <strong>¡Pedido aceptado! Realiza tu pago</strong>
+                        <p class="mb-2 small mt-1">Paga el total para que empiecen a preparar tu pedido.</p>
+                        {% if pedido.instrucciones_pago %}
+                            <ul class="list-unstyled mb-0 small text-start mx-auto" style="max-width: 420px;">
+                                {% if pedido.instrucciones_pago.yape_numero %}
+                                    <li><i class="bi bi-phone me-2"></i><strong>Yape:</strong> {{ pedido.instrucciones_pago.yape_numero }}</li>
+                                {% endif %}
+                                {% if pedido.instrucciones_pago.yape_titular %}
+                                    <li><i class="bi bi-person me-2"></i><strong>Titular:</strong> {{ pedido.instrucciones_pago.yape_titular }}</li>
+                                {% endif %}
+                                <li><i class="bi bi-cash-coin me-2"></i><strong>Monto:</strong> S/ {{ '%.2f'|format(pedido.total|float) }}</li>
+                                <li class="text-muted">También puedes pagar en efectivo al recoger.</li>
+                                {% if pedido.instrucciones_pago.mensaje_pago %}
+                                    <li class="text-muted mt-1">{{ pedido.instrucciones_pago.mensaje_pago }}</li>
+                                {% endif %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% elif pedido.estado == 'en_preparacion' %}
+                    <div class="alert estado-grande bg-success-subtle border-success mb-4 py-3">
+                        <i class="bi bi-fire display-6 d-block mb-2"></i>
+                        <strong>Estamos cocinando tu pedido</strong>
+                        <p class="mb-0 small mt-1">Te avisaremos cuando esté listo.</p>
+                    </div>
+                {% elif pedido.estado == 'listo' %}
+                    <div class="alert estado-grande bg-success-subtle border-success mb-4 py-3">
+                        <i class="bi bi-check2-circle display-6 d-block mb-2"></i>
+                        <strong>¡Listo para recoger!</strong>
+                        <p class="mb-0 small mt-1">Pasa por el mostrador, tu pedido te espera.</p>
+                    </div>
+                {% elif pedido.estado == 'entregado' %}
+                    <div class="alert estado-grande bg-secondary-subtle border-secondary mb-4 py-3">
+                        <i class="bi bi-emoji-smile display-6 d-block mb-2"></i>
+                        <strong>Pedido entregado. ¡Buen provecho!</strong>
+                    </div>
+                {% elif pedido.estado == 'rechazado' %}
+                    <div class="alert estado-grande bg-danger-subtle border-danger mb-4 py-3">
+                        <i class="bi bi-x-circle display-6 d-block mb-2"></i>
+                        <strong>Pedido no aceptado</strong>
+                        {% if pedido.motivo_rechazo %}<p class="mb-0 small mt-1">Motivo: {{ pedido.motivo_rechazo }}</p>{% endif %}
+                    </div>
+                {% elif pedido.estado == 'cancelado' %}
+                    <div class="alert estado-grande bg-secondary-subtle border-secondary mb-4 py-3">
+                        <i class="bi bi-slash-circle display-6 d-block mb-2"></i>
+                        <strong>Pedido cancelado</strong>
+                    </div>
+                {% endif %}
+
+                <!-- Detalle del pedido (solo lo que el cliente debe ver) -->
+                <ul class="list-group list-group-flush text-start">
+                    {% for linea in pedido.lineas %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span><i class="bi bi-egg-fried me-2 text-muted"></i>{{ linea.plato_nombre }}
+                                {% if linea.nota %}<span class="text-muted small">({{ linea.nota }})</span>{% endif %}
+                            </span>
+                            <strong>x{{ linea.cantidad }} · S/ {{ '%.2f'|format((linea.precio_venta|float) * linea.cantidad) }}</strong>
+                        </li>
+                    {% endfor %}
+                    <li class="list-group-item d-flex justify-content-between bg-light">
+                        <span class="fw-semibold">Total</span>
+                        <strong>S/ {{ '%.2f'|format(pedido.total|float) }}</strong>
+                    </li>
+                </ul>
+
+                <p class="text-muted small mt-3 mb-0">
+                    Guarda este enlace para seguir tu pedido. Esta página se actualiza sola.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Se refresca sola cada 15 s: siempre datos frescos, nada en caché.
+    setTimeout(function () { window.location.reload(); }, 15000);
+</script>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block titulo %}Hacer Pedido (recojo) - {{ config.nombre_local }}{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">
+                <h4 class="fw-bold mb-0"><i class="bi bi-bag-check me-2 text-warning"></i>Pedido para recojo</h4>
+                <small class="text-white-50">{{ config.nombre_local }}</small>
+            </div>
+            <div class="card-body p-4">
+
+                {% if not config.abierto %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-clock-history me-1"></i> El local está cerrado; puedes enviar tu pedido
+                        y el personal lo revisará al abrir.
+                    </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('publico.pedir') }}" id="form-pedido" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <!-- Campo trampa (honeypot): invisible para personas -->
+                    <input type="text" name="pagina_web" class="d-none" tabindex="-1" autocomplete="off">
+                    <!-- Las líneas del pedido llegan aquí en JSON -->
+                    <input type="hidden" name="items" id="items-json" value="[]">
+
+                    <!-- Platos: lista por categoría con selector de cantidad -->
+                    <label class="form-label fw-semibold">1. Elige tus platos</label>
+                    {% for grupo in carta %}
+                        <h6 class="mt-3 text-secondary border-bottom pb-1">{{ grupo.nombre }}</h6>
+                        {% for plato in grupo.platos %}
+                            <div class="d-flex align-items-center justify-content-between py-1">
+                                <div>
+                                    <strong>{{ plato.nombre }}</strong>
+                                    {% if plato.codigo %}<span class="badge bg-secondary badge-nro">N° {{ plato.codigo }}</span>{% endif %}
+                                    <span class="ms-2 text-nowrap">S/ {{ '%.2f'|format(plato.precio|float) }}</span>
+                                    {% if plato.descripcion %}<div class="small text-muted">{{ plato.descripcion }}</div>{% endif %}
+                                </div>
+                                {% if plato.disponible %}
+                                    <div class="input-group input-cant" style="max-width: 130px;">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm btn-restar"
+                                                data-plato="{{ plato.plato_id }}">−</button>
+                                        <input type="number" class="form-control form-control-sm text-center cant-plato"
+                                               id="cant-{{ plato.plato_id }}" value="0" min="0" max="99"
+                                               data-plato="{{ plato.plato_id }}"
+                                               data-precio="{{ '%.2f'|format(plato.precio|float) }}"
+                                               data-nombre="{{ plato.nombre }}" inputmode="numeric">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm btn-sumar"
+                                                data-plato="{{ plato.plato_id }}">+</button>
+                                    </div>
+                                {% else %}
+                                    <span class="badge bg-danger">Agotado</span>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% endfor %}
+
+                    <!-- Resumen del carrito (solo lo que el cliente ve; en el servidor se recalcula) -->
+                    <div class="alert alert-secondary mt-3 mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Platos: <strong id="conteo-platos">0</strong></span>
+                            <span>Total estimado: <strong>S/ <span id="total-estimado">0.00</span></strong></span>
+                        </div>
+                        <div class="form-text mb-0">El total lo confirma el personal al aceptar tu pedido.</div>
+                    </div>
+
+                    <!-- Datos del cliente -->
+                    <label class="form-label fw-semibold">2. Sus datos</label>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="nombre" name="nombre" maxlength="100"
+                               placeholder="Nombre de quien recoge *" required>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <input type="tel" class="form-control" id="telefono" name="telefono"
+                                   inputmode="numeric" pattern="9[0-9]{8}" maxlength="9" placeholder="Teléfono 9... *"
+                                   required>
+                            <div class="form-text">Le avisaremos aquí cuando su pedido esté listo.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <input type="email" class="form-control" id="correo" name="correo" maxlength="120"
+                                   placeholder="Correo (opcional)">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <textarea class="form-control" id="nota" name="nota" maxlength="300" rows="2"
+                                  placeholder="Nota para el restaurante (opcional, ej. sin ají)"></textarea>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="acepta_datos" name="acepta_datos" value="si" required>
+                        <label class="form-check-label small" for="acepta_datos">
+                            Autorizo el uso de mis datos solo para gestionar este pedido.
+                            <span class="text-danger">*</span>
+                        </label>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-warning btn-lg fw-bold shadow-sm">
+                            <i class="bi bi-send me-1"></i> Enviar pedido
+                        </button>
+                    </div>
+                    <p class="text-muted small text-center mt-3 mb-0">
+                        Tu pedido queda <strong>pendiente</strong>: el personal lo revisa y le indica cómo pagar
+                        (Yape/Plin) cuando lo acepta.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    /* Carrito simple: cantidades por plato -> items JSON + total estimado.
+       El servidor SIEMPRE recalcula el total con el precio real del plato. */
+    const contadores = {};
+
+    function recalcular() {
+        let cantidad_total = 0, total = 0;
+        const items = [];
+        document.querySelectorAll('.cant-plato').forEach(inp => {
+            const cant = parseInt(inp.value, 10) || 0;
+            if (cant > 0) {
+                cantidad_total += cant;
+                total += cant * parseFloat(inp.dataset.precio);
+                items.push({ plato_id: parseInt(inp.dataset.plato, 10), cantidad: cant });
+            }
+        });
+        document.getElementById('conteo-platos').textContent = cantidad_total;
+        document.getElementById('total-estimado').textContent = total.toFixed(2);
+        document.getElementById('items-json').value = JSON.stringify(items);
+    }
+
+    document.querySelectorAll('.btn-sumar').forEach(b => b.addEventListener('click', () => {
+        const inp = document.getElementById('cant-' + b.dataset.plato);
+        inp.value = Math.min(99, (parseInt(inp.value, 10) || 0) + 1);
+        recalcular();
+    }));
+    document.querySelectorAll('.btn-restar').forEach(b => b.addEventListener('click', () => {
+        const inp = document.getElementById('cant-' + b.dataset.plato);
+        inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) - 1);
+        recalcular();
+    }));
+    document.querySelectorAll('.cant-plato').forEach(inp => inp.addEventListener('input', recalcular));
+</script>
+{% endblock %}

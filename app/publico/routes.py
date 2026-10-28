@@ -6,6 +6,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from app.db import consultar_uno
 from app.servicios import carta as servicio_carta
 from app.servicios import reservas as servicio_reservas
+from app.servicios import pedidos as servicio_pedidos
 
 publico_bp = Blueprint("publico", __name__)
 
@@ -100,3 +101,54 @@ def reserva_estado(token):
         return render_template("errores/404.html"), 404
     config = _config_basica()
     return render_template("publico/reserva_estado.html", reserva=reserva, config=config)
+
+
+# ---------------------------------------------------------------- pedir (recojo por la web)
+
+@publico_bp.route("/pedir", methods=["GET", "POST"])
+def pedir():
+    """Formulario público de pedido para RECOJO. Nace 'pendiente': el staff lo revisa,
+    ajusta si faltó algo y lo acepta: recién ahí se muestra la forma de pago al cliente.
+    """
+    config = _config_basica()
+    carta_datos = servicio_carta.obtener_carta_publica()
+
+    if request.method == "POST":
+        # Campo trampa (honeypot) anti bots
+        if (request.form.get("pagina_web") or "").strip():
+            flash("No se pudo registrar el pedido. Verifica los datos e intenta nuevamente.", "danger")
+        else:
+            # Los platos pedidos llegan como JSON en el campo oculto 'items'
+            import json as json_mod
+            try:
+                items = json_mod.loads(request.form.get("items") or "[]")
+            except ValueError:
+                items = []
+
+            datos = {
+                "nombre": request.form.get("nombre"),
+                "telefono": request.form.get("telefono"),
+                "correo": request.form.get("correo"),
+                "nota": request.form.get("nota"),
+                "acepta_datos": request.form.get("acepta_datos"),
+                "items": items,
+            }
+            try:
+                pedido = servicio_pedidos.crear_pedido_recojo_web(datos)
+                flash(f"¡Pedido recibido! El personal lo revisará en breve. "
+                      f"Guarde este enlace para seguir su estado.", "success")
+                return redirect(url_for("publico.pedido_estado", token=pedido["token"]))
+            except ValueError as error:
+                flash(str(error), "danger")
+
+    return render_template("publico/pedir.html", config=config, carta=carta_datos)
+
+
+@publico_bp.route("/pedido/<token>")
+def pedido_estado(token):
+    """Seguimiento público del pedido por token UUID (se refresca sola cada 15 s)."""
+    pedido = servicio_pedidos.obtener_pedido_publico(token)
+    if not pedido:
+        return render_template("errores/404.html"), 404
+    config = _config_basica()
+    return render_template("publico/pedido_estado.html", pedido=pedido, config=config)
