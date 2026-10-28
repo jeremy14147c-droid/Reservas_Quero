@@ -8,6 +8,7 @@ from app.api.helpers import respuesta_ok, respuesta_error
 from app.auth.decoradores import requiere_rol
 from app.servicios import carta as servicio_carta
 from app.servicios import reservas as servicio_reservas
+from app.servicios import pedidos as servicio_pedidos
 
 api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
@@ -262,3 +263,193 @@ def cambiar_hora_reserva(reserva_id):
         return respuesta_ok(_serializar_reserva(resultado))
     except Exception as e:
         return _manejar_error_negocio(e)
+
+
+# ---------------------------------------------------------------- pedidos (Fase 3)
+
+def _serializar_pedido(p):
+    """Fila de pedido (o detalle) lista para JSON: fechas ISO 8601 y montos como float."""
+    datos = dict(p)
+    for campo, valor in list(datos.items()):
+        if campo == "token":
+            datos[campo] = str(valor)
+        elif hasattr(valor, "isoformat"):
+            datos[campo] = _iso(valor)
+        elif campo in ("total", "pagado") and valor is not None:
+            datos[campo] = float(valor)
+        elif campo in ("total", "pagado"):
+            datos[campo] = 0.0
+        elif campo == "cobrado":
+            datos[campo] = bool(valor)
+    # líneas y pagos (solo vienen en el detalle)
+    for campo in ("lineas", "pagos"):
+        if isinstance(datos.get(campo), list):
+            for fila in datos[campo]:
+                for subcampo, subvalor in list(fila.items()):
+                    if hasattr(subvalor, "isoformat"):
+                        fila[subcampo] = _iso(subvalor)
+                    elif subcampo in ("precio_venta", "monto") and subvalor is not None:
+                        fila[subcampo] = float(subvalor)
+    return datos
+
+
+def _manejar_error_pedido(error):
+    """Igual que el de reservas: ValueError -> 400 con mensaje claro."""
+    if isinstance(error, ValueError):
+        return respuesta_error("ERROR_NEGOCIO", str(error), 400)
+    return respuesta_error("ERROR_INTERNO", "Ocurrió un error inesperado en la operación.", 500)
+
+
+@api_bp.route("/pedidos/cola", methods=["GET"])
+@requiere_rol("admin", "empleado")
+def pedidos_cola():
+    """Cola del staff: pendientes, por cobrar, en cocina y listos (se refresca con fetch cada ~10 s)."""
+    try:
+        cola = servicio_pedidos.obtener_cola()
+    except Exception as e:
+        return _manejar_error_pedido(e)
+    return respuesta_ok({
+        columna: [_serializar_pedido(fila) for fila in filas]
+        for columna, filas in cola.items()
+    })
+
+
+@api_bp.route("/pedidos/cocina", methods=["GET"])
+@requiere_rol("admin", "empleado")
+def pedidos_cocina():
+    """Tablero de cocina: pedidos en preparación con minutos y la marca atrasado (solo visual)."""
+    try:
+        cocina = servicio_pedidos.obtener_cocina()
+    except Exception as e:
+        return _manejar_error_pedido(e)
+    return respuesta_ok({"pedidos": [_serializar_pedido(f) for f in cocina],
+                         "umbral_preparacion_min": servicio_pedidos.obtener_config()["umbral_preparacion_min"]})
+
+
+@api_bp.route("/pedidos/<int:pedido_id>", methods=["GET"])
+@requiere_rol("admin", "empleado")
+def pedido_detalle(pedido_id):
+    """Detalle completo (destino del QR del ticket)."""
+    try:
+        detalle = servicio_pedidos.obtener_pedido_detalle(pedido_id)
+    except Exception as e:
+        return _manejar_error_pedido(e)
+    if not detalle:
+        return respuesta_error("NO_ENCONTRADO", "El pedido no existe.", 404)
+    return respuesta_ok(_serializar_pedido(detalle))
+
+
+@api_bp.route("/pedidos/local", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def crear_pedido_local():
+    """Pedido en local creado por el staff (nace 'en_preparacion')."""
+    from app.auth.usuario import obtener_usuario_actual
+    usuario = obtener_usuario_actual()
+    datos = request.get_json(silent=True) or {}
+    try:
+        pedido = servicio_pedidos.crear_pedido_local_staff(
+            datos, personal_id=usuario.id if usuario else None
+        )
+        return respuesta_ok(_serializar_pedido(pedido), 201)
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/actualizar-lineas", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def actualizar_lineas(pedido_id):
+    """Ajusta/quita líneas de un pedido pendiente. Al aceptar, el total queda fijo."""
+    datos = request.get_json(silent=True) or {}
+    try:
+        detalle = servicio_pedidos.actualizar_lineas(pedido_id, datos.get("items"))
+        return respuesta_ok(_serializar_pedido(detalle))
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/aceptar", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def aceptar_pedido(pedido_id):
+    """El staff acepta el recojo pendiente: el monto queda fijo y se muestra al cliente la forma de pago."""
+    try:
+        resultado = servicio_pedidos.transicion_pedido(pedido_id, "aceptado")
+        return respuesta_ok(_serializar_pedido(resultado))
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/rechazar", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def rechazar_pedido(pedido_id):
+    """Rechaza un recojo pendiente (motivo obligatorio; se le informa al cliente)."""
+    datos = request.get_json(silent=True) or {}
+    try:
+        resultado = servicio_pedidos.transicion_pedido(pedido_id, "rechazado",
+                                                       motivo_rechazo=datos.get("motivo"))
+        return respuesta_ok(_serializar_pedido(resultado))
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/cancelar", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def cancelar_pedido(pedido_id):
+    """Cancela mientras no esté entregado."""
+    try:
+        resultado = servicio_pedidos.transicion_pedido(pedido_id, "cancelado")
+        return respuesta_ok(_serializar_pedido(resultado))
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/pagar", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def pagar_pedido(pedido_id):
+    """Registra un pago confirmado por el staff. Si queda cobrado y estaba aceptado, pasa a cocina."""
+    from app.auth.usuario import obtener_usuario_actual
+    usuario = obtener_usuario_actual()
+    datos = request.get_json(silent=True) or {}
+    if "monto" not in datos or "medio" not in datos:
+        return respuesta_error("DATOS_INCOMPLETOS", "Se requieren 'monto' y 'medio'.", 400)
+    try:
+        resumen = servicio_pedidos.registrar_pago(
+            pedido_id, datos["medio"], datos["monto"],
+            referencia=datos.get("referencia"),
+            personal_id=usuario.id if usuario else None
+        )
+        return respuesta_ok(_serializar_pedido(resumen))
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/preparar", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def preparar_pedido(pedido_id):
+    """Pasa un aceptado y cobrado a cocina (normalmente ocurre solo al registrar el pago)."""
+    try:
+        resultado = servicio_pedidos.transicion_pedido(pedido_id, "en_preparacion")
+        return respuesta_ok(_serializar_pedido(resultado))
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/listo", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def pedido_listo(pedido_id):
+    """Cocina marca el pedido como listo."""
+    try:
+        resultado = servicio_pedidos.transicion_pedido(pedido_id, "listo")
+        return respuesta_ok(_serializar_pedido(resultado))
+    except Exception as e:
+        return _manejar_error_pedido(e)
+
+
+@api_bp.route("/pedidos/<int:pedido_id>/entregar", methods=["POST"])
+@requiere_rol("admin", "empleado")
+def pedido_entregar(pedido_id):
+    """El cliente recibió su pedido (estado final)."""
+    try:
+        resultado = servicio_pedidos.transicion_pedido(pedido_id, "entregado")
+        return respuesta_ok(_serializar_pedido(resultado))
+    except Exception as e:
+        return _manejar_error_pedido(e)
