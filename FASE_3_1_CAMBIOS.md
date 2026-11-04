@@ -1,3 +1,6 @@
+> **Documento histórico (03/11/2026):** las fases 3.1 y 3.2 ya están hechas. La numeración y los prompts vigentes están en `PROMPTS_POR_FASE.md` (sección "Fases 3.x") y en `ESTADO_ACTUAL.md`.
+> **No uses los prompts 3.3 a 3.6 de este archivo:** fueron reemplazados.
+
 # Fase 3.x: cambios pedidos, diagnóstico y prompts
 
 Basado en el zip `Reservas_Quero (2).zip` (Fase 3). Todo lo que dice "verificado" lo comprobé leyendo tu código; **no ejecuté la app ni las pruebas**.

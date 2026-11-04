@@ -1,3 +1,8 @@
+> ⚠️ **ADVERTENCIA (03/11/2026):** este documento afirma que hay una capa DAO propia y que se trabaja con TDD ("primero la prueba").
+> Hoy **no es cierto**: el SQL está dentro de los servicios (`db.py` solo son helpers) y `git log` muestra que las pruebas se escribieron al final de cada fase.
+> No expongas esas frases tal cual. La Fase 3.R lo corrige y debe actualizar este documento y quitar este aviso.
+> Formulación honesta mientras tanto: *"Las pruebas se escribieron por fase, después del código. Desde la Fase 3.R aplicamos TDD con commits `test:` antes de `feat:` y una capa DAO por entidad."*
+
 # Defensa de sustentación — Quero Gastrobar (mapeo a la rúbrica)
 
 > Documento para prepararte en minutos. Cada criterio tiene: **qué hicimos**, **dónde está la

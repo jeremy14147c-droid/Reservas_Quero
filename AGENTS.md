@@ -2,6 +2,7 @@
 
 > Colocar este archivo en la RAÍZ del repositorio. El agente debe leerlo y respetarlo en cada tarea.
 > La fuente de verdad del modelo de datos es `schema.sql` (en la raíz).
+> **Lee primero `ESTADO_ACTUAL.md`**: dice qué fases están hechas, cuál sigue y en qué orden. Si algo de ese archivo contradice otro texto del repo, manda `ESTADO_ACTUAL.md` y luego este archivo.
 
 ## 1. Qué estamos construyendo
 Sistema web para gestionar **reservas** y **pedidos** de una pollería pequeña de Lima, Perú.
@@ -23,7 +24,10 @@ Los tres roles usan la misma web desde cualquier dispositivo con navegador:
 
 ## 2. Principios no negociables
 1. **El staff decide.** Ninguna reserva ni pedido remoto reduce capacidad, entra a cocina ni cambia de
-   estado sin una acción explícita del personal. Las alertas son solo visuales; nada se libera ni se cancela solo.
+   estado sin una acción explícita del personal. Las alertas de tolerancia son solo visuales.
+   **Única excepción (decidida el 03/11/2026): el vencimiento por tiempo de las reservas** (sección 7, "Vencimiento automático"):
+   una solicitud que nadie atendió a tiempo, o una reserva cuya ocupación de mesa ya terminó sin registrar la llegada, se cierra sola
+   y queda marcada como automática. Nada más se libera ni se cancela solo.
    **El staff nunca queda bloqueado por el cupo ni por la tolerancia:** la app avisa, el staff decide.
 2. **Cambiar lo mínimo los procesos del local.** La dueña hoy usa una pizarra, WhatsApp y tickets de una
    tiquetera. El sistema se adapta a eso.
@@ -55,13 +59,14 @@ quero/
 │   ├── pedidos/             # cola, cocina, cobro, ticket
 │   ├── carta/               # gestión de platos (staff)
 │   ├── admin/               # config del local y personal
-│   ├── servicios/           # lógica de negocio (reglas, transiciones, cálculos), SIN depender de Flask
+│   ├── servicios/           # lógica de negocio (reglas, transiciones, cálculos), SIN depender de Flask y SIN escribir SQL; incluye mensajes.py (textos de WhatsApp, funciones puras)
+│   ├── dao/                 # acceso a datos: UNA clase por entidad con TODO el SQL (ReservaDAO, ClienteDAO, PedidoDAO...), sin reglas de negocio
 │   ├── api/                 # rutas JSON /api/v1/... (las usan los tableros de la propia web y, en el final, el agente de impresión)
 │   ├── notificaciones/      # (proyecto final) correo, enlaces de WhatsApp, plantillas de mensajes
-│   ├── templates/  static/
+│   ├── templates/  static/  # templates/base.html (staff, sobrio) y base_cliente.html (público, con identidad del local); static/img (logo), static/css/cliente.css
 │   └── utils.py             # normalizar teléfono, generar códigos, formateo
 ├── migraciones/             # scripts SQL repetibles para bases ya creadas (NNN_nombre.sql)
-├── tests/
+├── tests/                   # pytest: reglas puras en tests/unidad/ (SIN base de datos) y el resto contra PostgreSQL
 └── manage.py                # comandos: init-db, cargar-ejemplo, crear-admin
 ```
 
@@ -78,6 +83,15 @@ quero/
 5. **Las respuestas de la API nunca incluyen** `password_hash` ni datos de clientes que el usuario no deba ver.
 6. **Instalable (Fase 4):** `manifest.webmanifest`, iconos y un service worker mínimo que NO guarda datos en caché (solo cumple con la instalación).
    Toda pantalla operativa pide siempre datos frescos al servidor.
+7. **Capas y dependencias (MVC + servicios + DAO):** Vista = `templates/` + `static/`; Controlador = `*/routes.py` y `api/routes.py` (delgados);
+   Modelo = `servicios/` (reglas) + `dao/` (SQL) + `schema.sql`. Las llamadas van en un solo sentido: ruta → servicio → DAO → `db.py`.
+   **Las rutas nunca importan `app.db` ni escriben SQL; los servicios tampoco** (se lo piden al DAO). El DAO no contiene reglas de negocio.
+   Esto es lo que se defiende en la exposición (MVC, DAO, SOLID).
+8. **La hora actual sale de UNA sola función** (`ahora_local()` / `hoy()`) que usa la zona `America/Lima` (`ZoneInfo`, con el paquete `tzdata` en requirements por Windows).
+   Prohibido usar `datetime.now()` o `date.today()` sueltos: en un servidor en la nube darían la hora de UTC (5 horas de diferencia).
+   Las reglas que dependen de la hora reciben `ahora` como parámetro para poder probarlas.
+9. **Reglas puras primero:** toda regla que se pueda expresar sin base de datos (franja pasada, mensajes de WhatsApp, transiciones de estado, redondeos)
+   vive en funciones puras y se prueba con pytest SIN base de datos.
 
 ## 5. Variables de entorno (`.env`, nunca se sube; subir solo `.env.example` con valores falsos)
 `DATABASE_URL`, `SECRET_KEY`, `BASE_URL` (para los QR), `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`,
@@ -131,6 +145,17 @@ quero/
 - Al cliente nunca se le muestran números de capacidad. Solo un semáforo por hora: *disponible / pocas mesas / lleno*
   (usar la constante `PORC_POCAS = 25` de `config.py` como valor de ejemplo ajustable).
 - Un cliente no puede tener dos reservas activas a la misma fecha y hora (ya lo garantiza un índice único; mostrar el error en claro).
+- **Horas pasadas (web):** una franja deja de ser reservable por la web cuando su inicio es anterior a `ahora_local()` + `anticipacion_min_min` (`config_local`, por defecto 30 min).
+  Se muestra deshabilitada con el texto "Ya pasó" (nunca se esconde sin explicar); si hoy no queda ninguna, mostrar "Hoy ya no hay horarios disponibles; elige otro día".
+  Se valida SIEMPRE en el servidor (`crear_reserva_web`), no solo en pantalla.
+- **Horas pasadas (staff):** el staff puede crear o cambiar una reserva a la franja que contiene la hora actual (llegó un grupo sin reserva), pero no a una franja que ya terminó.
+- **Pizarra del staff:** para HOY se muestran por defecto solo las franjas cuyo fin es posterior a la hora actual y las reservas que aún ocupan mesa;
+  un interruptor "Ver horas anteriores" muestra el día completo. Los demás días se ven completos.
+- **Vencimiento automático** (única excepción al principio 2.1): `liberar_reservas_vencidas(ahora)` cierra (a) las `pendiente` cuya hora ya pasó → `rechazada`
+  con motivo "Vencida: nadie la atendió a tiempo"; (b) las `confirmada` cuya ocupación de mesa terminó (hora + `fn_duracion_estadia`) → `no_llego` con motivo
+  "Automático: no se registró la llegada". Las `llego` no cambian. Se ejecuta de forma perezosa (al consultar la pizarra, el semáforo público y la API del día)
+  y con `python manage.py liberar-vencidas`; no hay hilos ni tareas de fondo. Es idempotente y deja `actualizado_en` y el motivo con ese prefijo.
+  El cupo ya se libera solo porque `fn_carga_dia` calcula por horario; este paso solo ordena los estados y limpia la pantalla.
 
 ## 8. Reglas de negocio – Pedidos y pagos
 - Dos tipos: `local` (cliente presente, lo registra el staff; `cliente_id` puede ir vacío) y `recojo` (lo pide el cliente por la web; exige cliente).
@@ -159,12 +184,18 @@ quero/
 - **Orden en cocina:** en las columnas "En cocina" y "Listos" y en el tablero de cocina, los pedidos `recojo` van PRIMERO (el cliente espera afuera
   o avisa su llegada) y luego los `local`, cada grupo por hora de llegada. En "Pendientes" y "Por cobrar" el orden sigue siendo por llegada.
 - **Mesa:** `mesa_referencia` es siempre opcional. Mostrarla solo si existe, sin repetir el texto ("Mesa 2", no "Mesa: Mesa 2").
+- **Imprimir desde cocina:** cada tarjeta de cocina tiene el mismo botón "Imprimir ticket" que la cola de pedidos (misma plantilla de ticket, sección 10). La pantalla de cocina
+  tiene además la casilla "Imprimir automáticamente los pedidos nuevos de esta pantalla" (apagada por defecto; imprime cada pedido una sola vez). Solo UN equipo debe tener
+  activa la impresión automática (el de cocina o el de caja), para no imprimir duplicados; mostrar esa advertencia junto a la casilla.
 
 ## 9. Contacto (MVP) y notificaciones (proyecto final)
-> **En el MVP se implementa:** el menú ⋮ de contacto (enlaces `wa.me`, `tel:` y `mailto:`, sin ninguna API) y las **alertas dentro del panel**
-> (insignia con el número de solicitudes nuevas y aviso sonoro opcional; ver sección 11).
-> El correo automático, el modal de WhatsApp, el uso de la tabla `notificacion` y las notificaciones push son del **proyecto final**: NO implementarlos todavía.
-> El resto de esta sección queda como especificación para esa etapa.
+> **Ahora se implementa (sin API y sin costo):** el menú ⋮ de contacto (`wa.me`, `tel:`, `mailto:`), las alertas dentro del panel (sección 11) y, desde la Fase 3.8,
+> el botón **"Avisar por WhatsApp"** tras cada acción del staff (abre WhatsApp con un mensaje ya redactado, amable y con emojis) y el botón del cliente
+> **"Enviar por WhatsApp al local"**. Todos los textos salen de `servicios/mensajes.py` (funciones puras, probadas con TDD).
+> **NO usar la API oficial de WhatsApp** (cobra por mensaje, exige plantillas aprobadas y consentimiento; ver `WHATSAPP_COSTOS.md`). Tampoco el correo automático,
+> la tabla `notificacion` ni las notificaciones push: son del **proyecto final** (Fase 5A).
+> **Publicidad ("pide más"):** va dentro de la web (bloque "Complementa tu pedido" en el carrito) y en un único mensaje amable al entregar, nunca en envíos masivos.
+> El resto de esta sección queda como especificación para la etapa final.
 - **Menú ⋮ en cada fila** de reservas y pedidos: WhatsApp (enlace `https://wa.me/51<9 dígitos>?text=<mensaje codificado>`),
   Llamar (`tel:+51...`), Correo (`mailto:`, solo si hay correo), Ver detalle, Imprimir ticket, y Cambiar hora (reservas).
 - **Al confirmar/rechazar una reserva y al aceptar/rechazar/dejar listo un pedido:**
@@ -206,6 +237,16 @@ quero/
 - **Pantalla de cocina:** pedir que la pantalla no se apague (Screen Wake Lock API) cuando el navegador lo permita.
 - **Sin conexión no se opera. No hay modo offline.** Si falla la conexión (evento `offline` o error de `fetch`), mostrar el banner "Sin conexión: no se puede operar"
   y deshabilitar los botones de acción (atributo `data-requiere-conexion`). Al volver la red, quitar el banner y refrescar. No guardar borradores locales.
+- **Identidad visual (cliente vs. staff):** las páginas públicas (`/`, `/carta`, `/reservar`, `/pedir`, seguimiento) usan `base_cliente.html`: logo, tipografía de títulos llamativa y otra muy legible
+  para el texto, colores del local como variables CSS, accesos directos (Reservar, Pedir, Carta, Cómo llegar, WhatsApp), pie con dirección, horario, mapa y redes, y botón flotante de WhatsApp.
+  El staff mantiene `base.html`, sobrio y muy legible. **Nunca se muestra el menú de staff en las páginas públicas** (con sesión de staff abierta, solo una franja "Sesión de staff · Volver al panel").
+  Los datos de contacto y marca salen de `config_local` (`whatsapp_numero`, `direccion`, `maps_url`, `instagram_url`, `facebook_url`), editables por la dueña; no inventar datos del local
+  (si faltan, un marcador visible "Pendiente: ..."). Las URL configurables deben empezar por `https://`. El logo es un archivo del repo (`static/img/logo.png`) con respaldo en texto.
+  Las fuentes se cargan con `font-display: swap` y pila de respaldo, o se alojan en `static/fonts/`.
+- **Elegir platos en celular** (el 99 % de los clientes): categorías como barra horizontal pegada arriba y secciones desplegables (acordeón; abierta la categoría activa), buscador,
+  tarjetas con +/−, barra inferior "Ver pedido · N · S/ total" y panel (offcanvas) de resumen. La tarjeta de plato reserva un espacio para imagen opcional y se ve bien sin ella,
+  para escalar a más o menos platos sin rediseñar. Igual en la carta pública.
+- Pantallas del staff: botones grandes, sin adornos; la identidad llamativa es solo para el cliente.
 
 ## 12. Seguridad (obligatorio)
 Consultas SIEMPRE parametrizadas · CSRF en todos los formularios · contraseñas con hash · autoescape de Jinja activo ·
@@ -225,3 +266,10 @@ recepción de reservas por WhatsApp, modo sin conexión, cuentas de cliente y ap
 4. Los cambios de base de datos se hacen en scripts repetibles dentro de `migraciones/` y, en las fases que lo indiquen explícitamente, también en `schema.sql`.
 5. Comentarios en español, nombres de variables y funciones en español claro, sin abreviaturas raras.
 6. Si algo no está definido aquí, **pregunta o propón una opción**; no inventes reglas del negocio.
+7. **TDD desde la Fase 3.R (obligatorio).** Para toda regla nueva o corrección de error: (1) escribe PRIMERO la prueba y ejecútala: tiene que FALLAR por la razón correcta;
+   commit `test: ...`; (2) escribe el código mínimo hasta que pase; commit `feat: ...` o `fix: ...`; (3) refactoriza con todo en verde; commit `refactor: ...`.
+   En el reporte muestra la salida roja y la verde. Las reglas puras se prueban sin base de datos. Un cambio solo visual no tiene prueba automática: dilo y di qué probaste a mano.
+8. **Git:** una rama por fase (`fase-3-r`, `fase-3-3`...), commits con prefijo (`test:`, `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`). Al terminar la fase con todo en verde se integra a `main`
+   (Pull Request en GitHub o merge con mensaje claro). Nunca versionar `.venv/`, `.env`, `__pycache__/` ni `.vscode/`.
+9. **Honestidad en los documentos de defensa** (`DEFENSA_RUBRICA.md`, `GUION_EXPOSICION.md`, `GUIA_ENTENDER_EL_PROYECTO.md`): solo se afirma lo que el código y `git log` pueden demostrar.
+   Al terminar cada fase, revisa que esos documentos sigan siendo ciertos (conteo de pruebas, carpetas, líneas citadas).
