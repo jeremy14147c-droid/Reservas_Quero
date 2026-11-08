@@ -91,27 +91,29 @@ def test_fn_carga_dia_franjas_por_tamano(app, limpiar_f32):
         # horas separadas para que las estadías no se solapen entre sí
         servicio_reservas.crear_reserva_staff(
             {"nombre": "F32 Grande", "telefono": TELS_F32[0], "fecha": fecha,
-             "hora": "19:00", "personas": 8}, personal_id=None)
+             "hora": "16:00", "personas": 8}, personal_id=None)
         servicio_reservas.crear_reserva_staff(
             {"nombre": "F32 Medio", "telefono": TELS_F32[1], "fecha": fecha,
-             "hora": "20:30", "personas": 5}, personal_id=None)
+             "hora": "18:00", "personas": 5}, personal_id=None)
         servicio_reservas.crear_reserva_staff(
             {"nombre": "F32 Chico", "telefono": TELS_F32[2], "fecha": fecha,
-             "hora": "21:30", "personas": 2}, personal_id=None)
+             "hora": "19:30", "personas": 2}, personal_id=None)
 
         carga = servicio_reservas.carga_dia(fecha)
         personas_por_inicio = {f["franja_inicio"].strftime("%H:%M"): f["personas"] for f in carga}
         # 90 min = 3 franjas de 30
-        assert personas_por_inicio["19:00"] == 8
-        assert personas_por_inicio["19:30"] == 8
-        assert personas_por_inicio["20:00"] == 8
+        assert personas_por_inicio["16:00"] == 8
+        assert personas_por_inicio["16:30"] == 8
+        assert personas_por_inicio["17:00"] == 8
+        assert personas_por_inicio["17:30"] == 0
         # 60 min = 2 franjas
-        assert personas_por_inicio["20:30"] == 5
-        assert personas_por_inicio["21:00"] == 5
+        assert personas_por_inicio["18:00"] == 5
+        assert personas_por_inicio["18:30"] == 5
+        assert personas_por_inicio["19:00"] == 0
         # 30 min = 1 franja
-        assert personas_por_inicio["21:30"] == 2
+        assert personas_por_inicio["19:30"] == 2
         # y ya no se arrastra a las franjas siguientes
-        assert personas_por_inicio["22:00"] == 0
+        assert personas_por_inicio["20:00"] == 0
 
 
 def test_api_dia_incluye_hasta_y_conserva_campos(cliente, usuario_prueba, limpiar_f32):
