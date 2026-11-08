@@ -420,8 +420,9 @@ def obtener_cocina():
     'atrasado' (rojo, solo visual) cuando supera umbral_preparacion_min de config_local.
     """
     config = obtener_config()
-    # la BD guarda TIMESTAMPTZ: se usa la hora local CON zona para restar bien
-    ahora = datetime.now().astimezone()
+    # la BD guarda TIMESTAMPTZ: se usa la hora local de Lima CON zona para restar bien
+    from app.utils import ahora_local
+    ahora = ahora_local()
 
     filas = consultar_todos(
         """SELECT p.pedido_id, p.token, p.tipo, p.estado, p.mesa_referencia, p.nota,

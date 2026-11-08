@@ -14,7 +14,7 @@ import psycopg
 from datetime import date, datetime, time, timedelta
 
 from app.db import consultar_todos, consultar_uno, ejecutar, ejecutar_retornando
-from app.utils import normalizar_telefono, generar_codigo_reserva, formato_hora_12h
+from app.utils import normalizar_telefono, generar_codigo_reserva, formato_hora_12h, hoy, ahora_local, ZONA_HORARIA_LIMA
 from app.servicios import clientes as servicio_clientes
 from app.config import Config
 
@@ -32,18 +32,8 @@ class CupoNoDisponible(ValueError):
 
 
 # ---------------------------------------------------------------- zona horaria
-# La app opera en America/Lima. El servidor local corre con esa hora, así que
-# usamos la hora local del equipo (datetime.now) para calendarios y tolerancia.
+# La app opera en America/Lima (definido en app.utils con ZoneInfo).
 
-
-def hoy():
-    """Fecha local de hoy (solo se usa como base del calendario público)."""
-    return datetime.now().date()
-
-
-def ahora_local():
-    """Fecha y hora local completas (se usa para la alerta de tolerancia)."""
-    return datetime.now()
 
 
 # ---------------------------------------------------------------- configuración
@@ -488,7 +478,7 @@ def obtener_pizarra(fecha):
         fecha_r = fecha_r if isinstance(fecha_r, date) else datetime.strptime(fecha_r, "%Y-%m-%d").date()
         hora_r = r["hora"]
         hora_r = hora_r if isinstance(hora_r, time) else datetime.strptime(str(hora_r)[:5], "%H:%M").time()
-        return datetime.combine(fecha_r, hora_r)
+        return datetime.combine(fecha_r, hora_r, tzinfo=ZONA_HORARIA_LIMA)
 
     pendientes = []
     ocupadas = []
@@ -508,11 +498,10 @@ def obtener_pizarra(fecha):
             ocupadas.append(r)
 
     franjas = []
+    fecha_dt = fecha if isinstance(fecha, date) else datetime.strptime(str(fecha), "%Y-%m-%d").date()
     for f in franjas_sql:
-        ini = datetime.combine(fecha if isinstance(fecha, date) else datetime.strptime(str(fecha), "%Y-%m-%d").date(),
-                               f["franja_inicio"])
-        fin = datetime.combine(fecha if isinstance(fecha, date) else datetime.strptime(str(fecha), "%Y-%m-%d").date(),
-                               f["franja_fin"])
+        ini = datetime.combine(fecha_dt, f["franja_inicio"], tzinfo=ZONA_HORARIA_LIMA)
+        fin = datetime.combine(fecha_dt, f["franja_fin"], tzinfo=ZONA_HORARIA_LIMA)
         ocupan_esta = []
         for r in ocupadas:
             inicio_reserva = _fecha_hora(r)

@@ -5,6 +5,19 @@ import re
 import secrets
 import string
 from datetime import date, time, datetime
+from zoneinfo import ZoneInfo
+
+ZONA_HORARIA_LIMA = ZoneInfo("America/Lima")
+
+
+def ahora_local():
+    """Fecha y hora actual exacta en la zona horaria de Lima (America/Lima)."""
+    return datetime.now(ZONA_HORARIA_LIMA)
+
+
+def hoy():
+    """Fecha actual en la zona horaria de Lima (America/Lima)."""
+    return ahora_local().date()
 
 
 def normalizar_telefono(telefono):
