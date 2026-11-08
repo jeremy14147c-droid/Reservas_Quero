@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel de Control · Quero</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/panel.js" defer></script>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <img src="/logo.png" alt="Quero">
+      <span style="font-size:0.95rem; color:var(--suave);">· Panel de Gestión</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.8rem;">
+      <span id="user-info" style="font-size:0.85rem; color:var(--suave); background:var(--fondo); padding:0.4rem 0.8rem; border-radius:20px; border:1px solid var(--borde);">
+        Cargando...
+      </span>
+      <button id="btn-logout" class="btn btn-no" style="font-size:0.8rem; padding:0.4rem 0.8rem;">
+        Cerrar sesión
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="tab-reservas">📅 Pizarra de Reservas</button>
+    <button class="tab-btn" data-tab="tab-pedidos">🍳 Pedidos & Cocina</button>
+    <button class="tab-btn admin-only" data-tab="tab-carta">📋 Gestión de Carta</button>
+    <button class="tab-btn admin-only" data-tab="tab-config">⚙️ Configuración del Local</button>
+  </nav>
+
+  <main>
+    <section id="tab-reservas" class="tab-content active">
+      <div class="card">
+        <h2>Solicitudes de Reserva</h2>
+        <div id="lista-reservas">Cargando reservas...</div>
+      </div>
+    </section>
+
+    <section id="tab-pedidos" class="tab-content">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h2>Comandas y Pedidos Activos</h2>
+          <button class="btn btn-ok" onclick="abrirModalComanda()">+ Nueva Comanda / Mesa</button>
+        </div>
+        
+        <div id="box-comanda" style="display:none; background:var(--fondo); border:1px solid var(--borde); border-radius:10px; padding:1.2rem; margin-bottom:1.5rem;">
+          <h3 style="font-size:1.1rem; margin-bottom:1rem; color:var(--verde);">📝 Tomar Comanda de Mesa</h3>
+          
+          <div style="margin-bottom:1rem; max-width:300px;">
+            <label>Mesa de Referencia</label>
+            <input type="text" id="comanda-mesa" placeholder="Ej: Mesa 4, Terraza 2, Barra">
+          </div>
+
+          <div style="display:flex; gap:0.8rem; align-items:flex-end; margin-bottom:1rem; flex-wrap:wrap;">
+            <div style="flex:2; min-width:200px;">
+              <label>Plato / Bebida</label>
+              <select id="comanda-plato"></select>
+            </div>
+            <div style="width:90px;">
+              <label>Cantidad</label>
+              <input type="number" id="comanda-cant" value="1" min="1" max="20">
+            </div>
+            <button type="button" class="btn btn-ok" onclick="agregarItemComanda()" style="padding:0.75rem 1rem;">
+              + Agregar
+            </button>
+          </div>
+
+          <div id="comanda-items-lista" style="background:var(--sup); border:1px solid var(--borde); border-radius:8px; padding:0.8rem; margin-bottom:1rem; min-height:60px;">
+            <p style="color:var(--suave); font-size:0.85rem; margin:0;">No has agregado platos a esta comanda aún.</p>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:1.1rem; font-weight:bold;">
+              Total Comanda: <span id="comanda-total-txt" style="color:var(--verde);">S/ 0.00</span>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+              <button class="btn btn-no" onclick="cerrarModalComanda()">Cancelar</button>
+              <button class="btn btn-ok" onclick="enviarComandaFinal()">🚀 Mandar a Cocina</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="lista-pedidos">Cargando pedidos...</div>
+      </div>
+    </section>
+
+    <section id="tab-carta" class="tab-content">
+      <div class="card">
+        <h2>Carta y Disponibilidad de Platos</h2>
+        <table>
+          <thead>
+            <tr><th>Categoría</th><th>Plato</th><th>Precio</th><th>Estado</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="tabla-carta"><tr><td colspan="5">Cargando carta...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-config" class="tab-content">
+      <div class="card">
+        <h2>Ajustes del Restaurante</h2>
+        <form id="form-config">
+          <div class="form-row">
+            <div>
+              <label>Aforo Máximo (Personas)</label>
+              <input type="number" id="cfg-aforo" required>
+            </div>
+            <div>
+              <label>Total de Mesas</label>
+              <input type="number" id="cfg-mesas" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label>Número de Yape / Plin</label>
+              <input type="text" id="cfg-yape-num">
+            </div>
+            <div>
+              <label>Titular de Yape</label>
+              <input type="text" id="cfg-yape-tit">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-ok" style="padding:0.7rem 1.5rem;">Guardar Cambios</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quero · Sabor & Gestión</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/cliente.js" defer></script>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="brand" style="text-decoration:none;">
+      <img src="/logo.png" alt="Quero - Sabor & Gestión">
+    </a>
+    <nav role="tablist" style="display:flex; gap:0.5rem; align-items:center;">
+      <button id="t-cli" class="btn" aria-selected="true">Reservar mesa</button>
+      <button id="t-carta" class="btn" aria-selected="false">🍽️ Nuestra Carta</button>
+      <a href="/login.html" class="btn" style="text-decoration:none; margin-left:8px;">Acceso Staff</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="v-cli">
+      <div class="card">
+        <h2 style="margin-bottom:0.4rem;">Reserva tu mesa</h2>
+        <p style="color:var(--suave); font-size:0.9rem; margin-bottom:1.5rem;">
+          Elige cuántas personas son y una hora. Verás qué horas tienen mesa disponible en tiempo real.
+        </p>
+
+        <div style="max-width:200px; margin-bottom:1rem;">
+          <label for="n">Cantidad de personas</label>
+          <input type="number" id="n" value="4" min="1" max="20">
+        </div>
+
+        <label>Hora (hoy)</label>
+        <div id="horas"></div>
+
+        <div class="form-row" style="margin-top:1.5rem;">
+          <div>
+            <label for="nom">Nombre completo</label>
+            <input type="text" id="nom" placeholder="Tu nombre y apellido">
+          </div>
+          <div>
+            <label for="tel">Teléfono (9 dígitos)</label>
+            <input type="tel" id="tel" placeholder="9XXXXXXXX" maxlength="9">
+          </div>
+        </div>
+
+        <div style="margin:1rem 0; font-size:0.85rem; color:var(--suave);">
+          <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+            <input type="checkbox" id="acepta" checked style="width:auto;">
+            Acepto que el local use mis datos para gestionar mi reserva.
+          </label>
+        </div>
+
+        <button type="button" id="enviar" class="btn btn-ok" style="padding:0.8rem 1.5rem; font-size:1rem;">
+          Solicitar reserva
+        </button>
+
+        <div id="res-cli"></div>
+      </div>
+    </section>
+
+    <section id="v-carta" hidden>
+      <div style="margin-bottom:1.5rem;">
+        <h2 style="font-size:1.8rem; margin-bottom:0.4rem; color:var(--verde);">Nuestra Carta</h2>
+        <p style="color:var(--suave);">Platos tradicionales preparados al momento con ingredientes frescos.</p>
+      </div>
+      <div id="lista-carta-cliente" style="display:grid; gap:1rem;"></div>
+    </section>
+  </main>
+
+  <a href="https://wa.me/51996908138?text=Hola%20Quero,%20tengo%20una%20consulta" target="_blank" class="wsp-float" title="Escríbenos a WhatsApp">
+    💬
+  </a>
+
+  <footer>
+    <div style="max-width:900px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:2rem; text-align:left;">
+      <div>
+        <img src="/logo.png" alt="Quero" style="height:35px; background:#fff; padding:2px 6px; border-radius:6px; margin-bottom:0.8rem;">
+        <p style="line-height:1.5;">Tradición culinaria, ingredientes selectos y un servicio pensado para que disfrutes de cada momento.</p>
+      </div>
+      <div>
+        <h4 style="color:var(--tinta); margin-bottom:0.6rem;">🕒 Horario de Atención</h4>
+        <p>Martes a Domingo</p>
+        <p style="color:var(--verde); font-weight:bold;">12:00 pm – 10:00 pm</p>
+        <p style="font-size:0.8rem; margin-top:0.4rem;">Lunes: Cerrado por descanso</p>
+      </div>
+      <div>
+        <h4 style="color:var(--tinta); margin-bottom:0.6rem;">📍 Encuéntranos</h4>
+        <p>Local Principal Quero</p>
+        <p style="margin-top:0.6rem;">
+          <a href="https://www.google.com/maps/search/?api=1&query=Restaurante+Quero" target="_blank" rel="noopener noreferrer" style="color:var(--verde); text-decoration:none; font-weight:bold;">
+            Ver en Google Maps →
+          </a>
+        </p>
+      </div>
+    </div>
+    <div style="text-align:center; border-top:1px solid var(--borde); margin-top:2rem; padding-top:1.5rem; font-size:0.8rem;">
+      © 2026 Quero · Todos los derechos reservados.
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -41,6 +41,10 @@ CREATE DATABASE quero OWNER quero_app;
 ```
 psql -h localhost -U quero_app -d quero -f schema.sql
 psql -h localhost -U quero_app -d quero -f seed.sql
+
+Para laptop nueva:
+
+"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h localhost -U quero_app -d quero -f schema.sql
 ```
 Te pedirá la contraseña de `quero_app`.
 

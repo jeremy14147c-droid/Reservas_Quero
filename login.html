@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso Personal · Quero</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/login.js" defer></script>
+</head>
+<body style="align-items:center; justify-content:center; padding:1rem;">
+
+  <div class="card" style="width:100%; max-width:380px; text-align:center;">
+    <div style="margin-bottom:1rem;">
+      <img src="/logo.png" alt="Quero" style="height:45px; background:#fff; padding:4px 8px; border-radius:6px;">
+    </div>
+    <h1 style="font-size:1.5rem; margin-bottom:0.3rem;">Acceso Staff</h1>
+    <p style="color:var(--suave); font-size:0.9rem; margin-bottom:1.5rem;">Sistema de Gestión Quero</p>
+
+    <div id="error" style="display:none; background:var(--mal-bg); color:var(--mal-tx); padding:0.7rem; border-radius:6px; margin-bottom:1rem; font-size:0.85rem;"></div>
+
+    <form id="form-login" style="text-align:left;">
+      <div style="margin-bottom:1.2rem;">
+        <label for="correo">Correo Electrónico</label>
+        <input type="email" id="correo" placeholder="ejemplo@quero.pe" required autocomplete="email">
+      </div>
+      <div style="margin-bottom:1.2rem;">
+        <label for="clave">Contraseña</label>
+        <input type="password" id="clave" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-ok" style="width:100%; padding:0.8rem; font-size:1rem;">
+        Ingresar al Panel
+      </button>
+    </form>
+
+    <div style="margin-top:1.5rem; font-size:0.75rem; color:var(--suave); border-top:1px dashed var(--borde); padding-top:1rem; text-align:left; line-height:1.5;">
+      <strong>Accesos de prueba:</strong><br>
+      • Admin: <code>admin@quero.pe</code> (clave: <code>admin123</code>)<br>
+      • Mozo: <code>mozo@quero.pe</code> (clave: <code>mozo123</code>)
+    </div>
+
+    <a href="/" style="display:block; margin-top:1.5rem; color:var(--suave); text-decoration:none; font-size:0.85rem;">
+      ← Volver a la página del Cliente
+    </a>
+  </div>
+
+</body>
+</html>

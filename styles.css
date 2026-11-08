@@ -1,0 +1,248 @@
+:root {
+  --fondo: #111a17;
+  --sup: #1a2521;
+  --tinta: #e7eeea;
+  --suave: #9db0a8;
+  --borde: #2f403a;
+  --verde: #6dbb9f;
+  --verde-txt: #0e1f19;
+  --mal-bg: #481d19;
+  --mal-tx: #f4a9a0;
+  --alerta-bg: #4a3810;
+  --alerta-tx: #fbd38d;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: var(--fondo);
+  color: var(--tinta);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background: var(--sup);
+  border-bottom: 1px solid var(--borde);
+  padding: 0.8rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: var(--verde);
+}
+
+.brand img {
+  height: 38px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--borde);
+  background: var(--sup);
+  color: var(--tinta);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  border-color: var(--verde);
+}
+
+.btn[aria-selected="true"], .btn-ok {
+  background: var(--verde);
+  color: var(--verde-txt);
+  border-color: var(--verde);
+}
+
+.btn-no {
+  background: var(--mal-bg);
+  color: var(--mal-tx);
+  border: none;
+}
+
+main {
+  flex: 1;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.card {
+  background: var(--sup);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--suave);
+  margin-bottom: 0.4rem;
+}
+
+input, select {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  color: var(--tinta);
+  font-size: 0.95rem;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--verde);
+}
+
+#horas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.6rem;
+  margin: 1.2rem 0;
+}
+
+.hora {
+  padding: 0.6rem;
+  background: var(--sup);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  color: var(--tinta);
+  cursor: pointer;
+  text-align: center;
+  font-weight: bold;
+}
+
+.hora small {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: normal;
+  margin-top: 2px;
+}
+
+.hora.libre { border-color: #17513c; color: #6dbb9f; }
+.hora.pocas { border-color: var(--alerta-bg); color: var(--alerta-tx); }
+.hora.lleno { opacity: 0.4; cursor: not-allowed; border-color: var(--borde); }
+.hora[aria-pressed="true"] { background: var(--verde); color: var(--verde-txt); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+th, td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--borde);
+}
+
+th {
+  color: var(--suave);
+  font-weight: 600;
+}
+
+.badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+.badge-ok { background: #17513c; color: #dcefe6; }
+.badge-alerta { background: var(--alerta-bg); color: var(--alerta-tx); }
+
+nav.tabs {
+  display: flex;
+  background: var(--sup);
+  border-bottom: 1px solid var(--borde);
+  padding: 0 1.5rem;
+  gap: 0.5rem;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--suave);
+  padding: 0.9rem 1.2rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+}
+
+.tab-btn.active {
+  color: var(--verde);
+  border-bottom-color: var(--verde);
+}
+
+.tab-btn.admin-only {
+  display: none;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.wsp-float {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999;
+  background: #25d366;
+  color: #fff;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+  text-decoration: none;
+  font-size: 28px;
+}
+
+footer {
+  background: var(--sup);
+  border-top: 1px solid var(--borde);
+  margin-top: 4rem;
+  padding: 2.5rem 1.5rem;
+  color: var(--suave);
+  font-size: 0.9rem;
+}
