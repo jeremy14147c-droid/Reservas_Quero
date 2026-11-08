@@ -1,16 +1,16 @@
-# ESTADO ACTUAL – léelo primero (actualizado el 03/11/2026)
+# ESTADO ACTUAL – léelo primero (actualizado el 08/11/2026)
 
-Archivo para el agente y para el equipo. Si algo contradice a otro documento del repo, manda este archivo y luego `AGENTS.md`.
+Archivo para el equipo y el agente. Si algo contradice a otro documento del repo, manda este archivo y luego `AGENTS.md`.
 
 ## 1. Dónde estamos
-- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa) y **3.2** (tiempo en mesa por tamaño de grupo y pizarra clara). 52 pruebas en verde.
-- La rama `fase-3-1` (con 3.1 y 3.2) **aún no está integrada a `main`**.
-- Siguiente paso: **Fase 3.0** (higiene de Git) y luego **3.R** (capa DAO). El detalle y los prompts están en `PROMPTS_POR_FASE.md`, sección "Fases 3.x".
+- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por tamaño de grupo y pizarra clara), **3.0** (higiene de Git: .venv removido del historial de Git) y **preparación para nube** (hora unificada de Lima con ZoneInfo y tzdata). 52 pruebas en verde.
+- La rama `main` ya tiene todo integrado y la base de datos en la nube (**Neon**) ya fue creada, poblada y verificada con `schema.sql`, `seed.sql` y el usuario admin.
+- Siguiente paso: Subir los commits a GitHub (`git push origin main --tags`), conectar el servicio web en Render, y arrancar la **Fase 3.R** (capa DAO con TDD). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
 
 ## 2. Problemas detectados (verificados)
-1. `.venv/` está versionado en Git (más de 3.500 archivos) aunque `.gitignore` lo lista. `.env` no está en el historial (revisado).
+1. [RESUELTO en 3.0] `.venv/` ya no está versionado en Git (se eliminó del índice con `git rm -r --cached .venv`). `.env` no está en el historial (revisado).
 2. `DEFENSA_RUBRICA.md` y `GUION_EXPOSICION.md` afirman que hay una capa DAO propia y que se trabaja con TDD ("primero el test"). Hoy **no es cierto**: el SQL está dentro de los servicios (`db.py` solo son helpers) y `git log` muestra que las pruebas se escribieron al final de cada fase. La Fase 3.R lo corrige; hasta entonces no se exponen esas frases.
-3. `ahora_local()` y `hoy()` usan `datetime.now()` (hora del equipo, no la de Lima). En un servidor en la nube serían 5 horas de diferencia. Se corrige en la 3.3.
+3. [RESUELTO] `ahora_local()` y `hoy()` usan `ZoneInfo("America/Lima")` con el paquete `tzdata`. Funciona idéntico en Windows local y servidores en la nube.
 4. No se valida que la hora reservada ya haya pasado hoy (se puede reservar a las 12:00 pm a las 4:00 pm). Se corrige en la 3.3.
 5. Hay SQL dentro de rutas: `app/auth/routes.py` (3) y `app/publico/routes.py` (3). Se corrige en la 3.R.
 6. El principio 2.1 de `AGENTS.md` decía que nada se libera solo. Se pidió el vencimiento automático de reservas, así que ahora hay **una excepción explícita** (sección 7). Conviene confirmarla con la dueña.
@@ -24,17 +24,18 @@ Archivo para el agente y para el equipo. Si algo contradice a otro documento del
 - El cliente ve una interfaz de restaurante; el staff, una sobria. Las páginas públicas nunca muestran el menú de staff.
 
 ## 4. Orden de trabajo
-| Fase | Qué | Depende de |
-|---|---|---|
-| 3.0 | Higiene de Git e integración a `main` | – |
-| 3.R | Capa DAO real y arranque del TDD | 3.0 |
-| 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R |
-| 3.4 | Identidad visual del cliente | 3.3 |
-| 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 |
-| 3.6 | Cocina: imprimir y recojo primero | 3.5 |
-| 3.7 | Pago con comprobante | 3.6 |
-| 3.8 | WhatsApp sin costo (mensajes y botones) | 3.7 |
-| 3.9 | Imágenes de platos (opcional) | 3.7 |
+| Fase | Qué | Depende de | Estado |
+|---|---|---|---|
+| 3.0 | Higiene de Git e integración a `main` | – | Completado en `main` |
+| D | Despliegue en Neon y Render | 3.0 | Neon listo / Render en proceso |
+| 3.R | Capa DAO real y arranque del TDD | 3.0 | Pendiente |
+| 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R | Pendiente |
+| 3.4 | Identidad visual del cliente | 3.3 | Pendiente |
+| 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 | Pendiente |
+| 3.6 | Cocina: imprimir y recojo primero | 3.5 | Pendiente |
+| 3.7 | Pago con comprobante | 3.6 | Pendiente |
+| 3.8 | WhatsApp sin costo (mensajes y botones) | 3.7 | Pendiente |
+| 3.9 | Imágenes de platos (opcional) | 3.7 | Pendiente |
 
 La numeración de `FASE_3_1_CAMBIOS.md` queda **reemplazada** por esta.
 
