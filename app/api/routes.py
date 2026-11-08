@@ -27,7 +27,7 @@ def _iso(valor):
 def _serializar_reserva(r):
     """Fila de reserva lista para JSON (sin datos sensibles internos)."""
     datos = dict(r)
-    for campo in ("fecha", "hora", "hora_anterior", "creado_en"):
+    for campo in ("fecha", "hora", "hora_anterior", "creado_en", "hasta", "duracion_min"):
         if datos.get(campo) is not None:
             datos[campo] = _iso(datos[campo])
     return datos

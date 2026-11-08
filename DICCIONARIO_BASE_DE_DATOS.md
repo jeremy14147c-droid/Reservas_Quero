@@ -84,7 +84,9 @@ Todo lo que la dueña ajusta vive aquí, no en el código. `config_id = 1` (con 
 | `aforo_personas` | INT, CHECK > 0. Cantidad de personas, entero positivo. | NOT NULL. Sin él no se calcula el cupo de reservas. | Máximo de personas dentro del local. | OK |
 | `total_mesas` | INT, CHECK > 0. | NOT NULL, por el mismo motivo. | Cantidad de mesas. Es un límite **distinto** al aforo: con muchas reservas de 2 o 3 personas las mesas se acaban aunque el aforo no esté lleno. | OK |
 | `personas_por_mesa` | INT, CHECK > 0. | NOT NULL. Sin él no se pueden calcular las mesas que ocupa un grupo. | Personas que se sientan por mesa en promedio. Convierte personas en mesas (redondeo hacia arriba). | OK |
-| `duracion_estadia_min` | INT en minutos, CHECK > 0. Se guarda en minutos para poder sumarlo a una hora. | NOT NULL. Sin él no se sabe cuándo termina una reserva. | Cuánto tiempo ocupa mesa una reserva. Así el sistema sabe cuándo se libera sin que nadie registre la salida. | OK |
+| `duracion_1_3_min` | INT en minutos, CHECK > 0. DEFAULT 30. | NOT NULL. Sin él no se sabe cuándo termina la mesa de un grupo chico. | Cuánto tiempo ocupa mesa un grupo de 1 a 3 personas. El sistema libera el cupo solo, sin que nadie registre la salida. | OK |
+| `duracion_4_7_min` | INT en minutos, CHECK > 0. DEFAULT 60. | NOT NULL. Idem para grupos medianos. | Cuánto tiempo ocupa mesa un grupo de 4 a 7 personas. | OK |
+| `duracion_8_mas_min` | INT en minutos, CHECK > 0. DEFAULT 90. | NOT NULL. Idem para grupos grandes. | Cuánto tiempo ocupa mesa un grupo de 8 personas o más. La función SQL `fn_duracion_estadia(personas)` elige la columna que corresponde según el tamaño del grupo; nada recibe la duración desde Python. | OK |
 | `franja_min` | INT, solo 15, 30 o 60; DEFAULT 30. | NOT NULL. Si no se indica, 30. | Ancho de cada columna de la pizarra y de los horarios que se pueden elegir. | OK |
 | `tolerancia_min` | INT en minutos, CHECK ≥ 0. | NOT NULL. 0 significa sin tolerancia. | **Solo referencia:** pasados estos minutos desde la hora de la reserva, la app la **alerta** en rojo. No libera ni cancela nada. El staff decide si libera (`no_llego`) o reprograma. | OK |
 | `umbral_preparacion_min` | INT en minutos, CHECK > 0. | NOT NULL. | Minutos en cocina desde los cuales un pedido se resalta en rojo. También es solo visual. | OK |
@@ -260,7 +262,7 @@ Son cálculos que **no se guardan**: se calculan al consultar para no tener dato
 
 ### 4.3 Función `fn_carga_dia(fecha, [reserva_a_excluir])`
 - **Qué calcula:** para cada franja del día (de apertura a cierre, cada `franja_min`): reservas, personas, mesas, límites, lo libre, cuál recurso limita (`limita`: `mesas` o `personas`) y el `nivel`.
-- **Reglas de conteo:** solo cuentan `confirmada` y `llego`. Cada reserva ocupa mesa durante `duracion_estadia_min`, así que aparece en **todas** las franjas que cubre. Mesas por reserva = personas ÷ `personas_por_mesa`, redondeado hacia arriba. Límites = aforo y mesas × `porcentaje_reservable` (vacío = 100 %), redondeados hacia abajo.
+- **Reglas de conteo:** solo cuentan `confirmada` y `llego`. Cada reserva ocupa mesa durante la duración que manda `fn_duracion_estadia(personas)` (30 min para 1–3 pax, 60 para 4–7, 90 para 8 o más), así que aparece en **todas** las franjas que cubre. Mesas por reserva = personas ÷ `personas_por_mesa`, redondeado hacia arriba. Límites = aforo y mesas × `porcentaje_reservable` (vacío = 100 %), redondeados hacia abajo.
 - **`nivel`:** `excedido` si se superó el límite de personas o de mesas (se pinta en rojo); `alerta` si el más lleno de los dos llega a `umbral_alerta_pct`; `ok` en los demás casos. `personas_libres` y `mesas_libres` **pueden ser negativas** cuando hay exceso.
 - **Dónde se usa:** la pizarra digital del día. El parámetro opcional ignora una reserva al moverla de hora.
 

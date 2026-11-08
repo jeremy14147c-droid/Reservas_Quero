@@ -14,7 +14,7 @@ import psycopg
 from datetime import date, datetime, time, timedelta
 
 from app.db import consultar_todos, consultar_uno, ejecutar, ejecutar_retornando
-from app.utils import normalizar_telefono, generar_codigo_reserva, formato_hora_12h
+from app.utils import normalizar_telefono, generar_codigo_reserva, formato_hora_12h, hoy, ahora_local, ZONA_HORARIA_LIMA
 from app.servicios import clientes as servicio_clientes
 from app.config import Config
 
@@ -32,18 +32,8 @@ class CupoNoDisponible(ValueError):
 
 
 # ---------------------------------------------------------------- zona horaria
-# La app opera en America/Lima. El servidor local corre con esa hora, así que
-# usamos la hora local del equipo (datetime.now) para calendarios y tolerancia.
+# La app opera en America/Lima (definido en app.utils con ZoneInfo).
 
-
-def hoy():
-    """Fecha local de hoy (solo se usa como base del calendario público)."""
-    return datetime.now().date()
-
-
-def ahora_local():
-    """Fecha y hora local completas (se usa para la alerta de tolerancia)."""
-    return datetime.now()
 
 
 # ---------------------------------------------------------------- configuración
@@ -463,16 +453,18 @@ def obtener_pizarra(fecha):
     - ocupan: reservas confirmadas/llego que cubren cada franja (con marca 'continúa')
     - pendientes: solicitudes de la web (aparte; no ocupan franjas)
     - atrasadas: confirmadas pasadas de hora + tolerancia (solo alerta visual)
+    La duración de CADA reserva sale de fn_duracion_estadia (SQL): no se calcula en Python.
     """
     config = obtener_config()
     franjas_sql = carga_dia(fecha)
     tolerancia = timedelta(minutes=config["tolerancia_min"])
-    duracion = timedelta(minutes=config["duracion_estadia_min"])
     ahora = ahora_local()
 
     reservas_del_dia = consultar_todos(
         """SELECT r.reserva_id, r.codigo, r.cliente_id, r.fecha, r.hora, r.hora_anterior,
                   r.cantidad_personas, r.estado, r.canal, r.excede_cupo, r.nota, r.motivo,
+                  fn_duracion_estadia(r.cantidad_personas) AS duracion_min,
+                  (r.hora + make_interval(mins => fn_duracion_estadia(r.cantidad_personas)))::time AS hasta,
                   c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
                   c.correo AS cliente_correo
            FROM reserva r JOIN cliente c ON r.cliente_id = c.cliente_id
@@ -486,7 +478,7 @@ def obtener_pizarra(fecha):
         fecha_r = fecha_r if isinstance(fecha_r, date) else datetime.strptime(fecha_r, "%Y-%m-%d").date()
         hora_r = r["hora"]
         hora_r = hora_r if isinstance(hora_r, time) else datetime.strptime(str(hora_r)[:5], "%H:%M").time()
-        return datetime.combine(fecha_r, hora_r)
+        return datetime.combine(fecha_r, hora_r, tzinfo=ZONA_HORARIA_LIMA)
 
     pendientes = []
     ocupadas = []
@@ -506,15 +498,15 @@ def obtener_pizarra(fecha):
             ocupadas.append(r)
 
     franjas = []
+    fecha_dt = fecha if isinstance(fecha, date) else datetime.strptime(str(fecha), "%Y-%m-%d").date()
     for f in franjas_sql:
-        ini = datetime.combine(fecha if isinstance(fecha, date) else datetime.strptime(str(fecha), "%Y-%m-%d").date(),
-                               f["franja_inicio"])
-        fin = datetime.combine(fecha if isinstance(fecha, date) else datetime.strptime(str(fecha), "%Y-%m-%d").date(),
-                               f["franja_fin"])
+        ini = datetime.combine(fecha_dt, f["franja_inicio"], tzinfo=ZONA_HORARIA_LIMA)
+        fin = datetime.combine(fecha_dt, f["franja_fin"], tzinfo=ZONA_HORARIA_LIMA)
         ocupan_esta = []
         for r in ocupadas:
             inicio_reserva = _fecha_hora(r)
-            fin_reserva = inicio_reserva + duracion
+            # la ocupación de mesa dura lo que manda fn_duracion_estadia (columna duracion_min del SELECT)
+            fin_reserva = inicio_reserva + timedelta(minutes=r["duracion_min"])
             if inicio_reserva < fin and fin_reserva > ini:
                 r = dict(r)
                 r["continua"] = inicio_reserva < ini  # empezó en una franja anterior

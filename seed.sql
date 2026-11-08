@@ -5,12 +5,13 @@
 -- Cara 2: Bebidas, cervezas y coctelería
 -- =====================================================================
 INSERT INTO config_local
-  (config_id, nombre_local, aforo_personas, total_mesas, personas_por_mesa, duracion_estadia_min,
+  (config_id, nombre_local, aforo_personas, total_mesas, personas_por_mesa,
+   duracion_1_3_min, duracion_4_7_min, duracion_8_mas_min,
    franja_min, tolerancia_min, umbral_preparacion_min, max_reservas_web_por_telefono, umbral_alerta_pct,
    hora_apertura, hora_cierre, dias_max_anticipacion, porcentaje_reservable, abierto,
    yape_numero, yape_titular, mensaje_pago)
 VALUES
-  (1, 'Quero Gastrobar', 48, 12, 4, 90, 30, 15, 20, 2, 80,
+  (1, 'Quero Gastrobar', 48, 12, 4, 30, 60, 90, 30, 15, 20, 2, 80,
    '12:00', '23:00', 3, NULL, TRUE,
    '996908138', 'Quero Gastrobar', 'Envía tu comprobante de pago al WhatsApp 996908138 indicando tu código de pedido.')
 ON CONFLICT (config_id) DO UPDATE SET
@@ -19,6 +20,8 @@ ON CONFLICT (config_id) DO UPDATE SET
   yape_titular = EXCLUDED.yape_titular,
   mensaje_pago = EXCLUDED.mensaje_pago,
   hora_cierre = EXCLUDED.hora_cierre;
+-- OJO: los parámetros operativos (aforo, mesas, duraciones...) solo se insertan si la fila no
+-- existe; si ya existe NO se sobrescriben, para no borrar los ajustes hechos por la dueña.
 
 -- 1. Categorías en orden oficial: primero comidas (Cara 1) y luego bebidas (Cara 2)
 INSERT INTO categoria (nombre, orden, activa) VALUES

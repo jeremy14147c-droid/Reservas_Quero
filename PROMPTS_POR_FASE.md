@@ -8,6 +8,7 @@
 5. Si el agente propone cambiar el esquema o agregar paquetes, no lo aceptes sin discutirlo en el equipo.
 
 ## Alcance
+- **Plan vigente de las fases 3.x (desde el 03/11/2026): sección "Fases 3.x" más abajo, después de la Fase 3.** El estado y el orden están en `ESTADO_ACTUAL.md`.
 - **Sistema solo web** (adaptable a celular y computador, instalable como PWA). No hay app móvil.
 - **Primer avance (1 semana):** Fases 0 a 4.
 - **Proyecto final:** Fases 5A, 5B y 5C (notificaciones, impresión automática y reservas por WhatsApp). Son borradores: se revisan cuando llegue el momento.
@@ -189,6 +190,264 @@ Presenta el plan antes de programar.
 
 ---
 
+## Fases 3.x – Plan vigente (actualizado el 03/11/2026)
+
+**Estado:** 3.1 y 3.2 están HECHAS (52 pruebas en verde). Sigue la 3.0. Las fases se hacen en este orden, una rama por fase (AGENTS.md 14.8):
+
+| Fase | Qué | Estado |
+|---|---|---|
+| 3.1 | Buscador de platos, mesa sin texto repetido | Hecha |
+| 3.2 | Tiempo en mesa por tamaño de grupo (30/60/90) y pizarra clara | Hecha |
+| **3.0** | Higiene de Git (`.venv` versionado, integrar a `main`) | **Siguiente** |
+| 3.R | Capa DAO real + arranque del TDD | Pendiente |
+| 3.3 | Horas pasadas no reservables y vencimiento automático | Pendiente |
+| 3.4 | Identidad visual del cliente (logo, fuentes, WhatsApp, Maps) | Pendiente |
+| 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | Pendiente |
+| 3.6 | Cocina: imprimir, recojo primero | Pendiente |
+| 3.7 | Pago con comprobante del cliente y un solo botón | Pendiente |
+| 3.8 | WhatsApp sin costo: mensajes listos y botones | Pendiente |
+| 3.9 | Imágenes de platos (opcional, solo si hay fotos) | Opcional |
+
+> Esta numeración **reemplaza** la de `FASE_3_1_CAMBIOS.md` (que queda como documento histórico).
+> Todas las fases siguen AGENTS.md sección 14: plan primero, TDD (prueba en rojo → verde → refactor), commits con prefijo, probar en el navegador y reportar.
+
+### Fase 3.0 – Higiene de Git (sin tocar el código de la app)
+```
+Contexto: AGENTS.md (sección 14) y ESTADO_ACTUAL.md. El repositorio está en GitHub; la rama fase-3-1 contiene las Fases 3.1 y 3.2 (52 pruebas). Esta es la Fase 3.0. No cambies código de la aplicación.
+
+Haz:
+1. Revisa `git status`. Si hay cambios de código sin guardar, muéstramelos y pregúntame antes de seguir.
+2. El directorio .venv/ está versionado por error (más de 3000 archivos) aunque aparece en .gitignore. Quítalo del índice SIN borrarlo del disco:
+   `git rm -r --cached .venv` y commit "chore: dejar de versionar .venv". Haz lo mismo con __pycache__/ y .vscode/ si están versionados.
+3. Comprueba que .env NO está ni estuvo nunca en el historial (`git log --all --oneline -- .env`). Si alguna vez estuvo, avísame ANTES de hacer nada más (habría que cambiar las claves).
+4. Prueba que requirements.txt instala todo desde cero (venv nuevo, `pip install -r requirements.txt`) y agrega `tzdata` (zona horaria America/Lima en Windows). Commit "chore: tzdata en requirements".
+5. Integra fase-3-1 a main con un merge que conserve los commits (sin squash, sin reescribir historia, sin force push) con las 52 pruebas en verde. Crea la etiqueta v0.3.2 y sube main y la etiqueta.
+6. Crea la rama fase-3-r desde main.
+
+Criterio de terminado: `git ls-files | wc -l` baja de miles a cientos; mi .venv local sigue funcionando; main contiene los commits de 3.1 y 3.2; pytest en verde; .gitignore sigue ignorando .venv y .env. Presenta el plan antes de ejecutar.
+```
+
+### Fase 3.R – Capa DAO real y arranque del TDD
+```
+Contexto: AGENTS.md (secciones 4, 4b y 14, ya actualizadas) y el código actual. Fase 3.0 terminada, rama fase-3-r, 52 pruebas en verde. Esta es la Fase 3.R. Es un REFACTOR: el comportamiento visible NO cambia.
+
+Objetivo: separar de verdad el acceso a datos (patrón DAO) para que se cumpla MVC + servicios + DAO y se pueda demostrar en la exposición.
+
+Estado a corregir (verificado en el código): el SQL está repartido dentro de los servicios (carta.py, pedidos.py, reservas.py, personal.py, clientes.py, configuracion.py) y además hay consultas directas en rutas:
+app/auth/routes.py (3) y app/publico/routes.py (3). app/db.py es solo un conjunto de helpers genéricos, no un DAO.
+
+Haz, UNA entidad por commit y con las pruebas en verde después de CADA commit:
+1. Crea el paquete app/dao/ con una clase por entidad: ConfigDAO, ClienteDAO, PersonalDAO, CartaDAO (categoría y plato), ReservaDAO, PedidoDAO (incluye detalle y pago).
+   Cada método recibe parámetros y devuelve diccionarios o listas (nunca cursores), usa SOLO consultas parametrizadas y los helpers de app/db.py. Nombres en español
+   (ej. ReservaDAO.insertar, .buscar_por_id, .listar_del_dia, .actualizar_estado). Las llamadas a funciones SQL (fn_hay_cupo, fn_carga_dia, fn_duracion_estadia) también van en el DAO.
+2. Los servicios dejan de escribir SQL: piden los datos al DAO y conservan las reglas (validaciones, TRANSICIONES_VALIDAS, mensajes de error). Cada servicio recibe su DAO como dependencia
+   con un valor por defecto (parámetro o atributo de módulo reemplazable) para poder cambiarlo por uno falso en las pruebas.
+3. Las rutas dejan de importar app.db: auth/routes.py y publico/routes.py llaman a servicios (servicio_configuracion.obtener_config_local(), servicios/personal.py, etc.).
+   Al terminar, estas dos búsquedas deben salir vacías (las excepciones, si las hay, se explican una por una):
+   `grep -rn "app.db" app/*/routes.py app/api` y `grep -rniE "SELECT |INSERT |UPDATE |DELETE " app/servicios app/*/routes.py app/api`.
+4. Pruebas unitarias SIN base de datos en tests/unidad/ con un DAO falso en memoria. Mínimo tres: transicion_reserva rechaza pasar de rechazada a confirmada; un pedido recojo no pasa a cocina sin estar cobrado;
+   el tope de reservas web por teléfono. Deben pasar con PostgreSQL apagado. Esa es la evidencia de DAO + inversión de dependencias.
+5. TDD empezando aquí: para estas pruebas nuevas escribe la prueba primero, muéstrala en rojo, commit "test: ..." y luego implementa, commit "refactor: ...". El resto del refactor lo protegen las pruebas que ya existen.
+6. Documentos de defensa: corrige DEFENSA_RUBRICA.md, GUION_EXPOSICION.md y GUIA_ENTENDER_EL_PROYECTO.md para que digan SOLO lo que ahora es cierto: capa DAO en app/dao/, pruebas unitarias sin base,
+   y que hasta la Fase 3.2 las pruebas se escribieron al final de cada fase y que el TDD estricto empieza en la 3.R (con la evidencia en `git log --oneline`: commits test: antes de feat:).
+   Actualiza el conteo de pruebas, el mapa de carpetas y las líneas citadas, y quita el banner de advertencia cuando todo sea verdad.
+7. Actualiza AGENTS.md sección 4 si algo cambió.
+
+No toques: schema.sql, el comportamiento visible, las URL ni el formato JSON de la API.
+Criterio de terminado: pytest en verde (las 52 + las nuevas); las dos búsquedas con grep salen vacías; tests/unidad pasa con PostgreSQL apagado; la app funciona igual.
+Si el tiempo aprieta: haz Reserva, Cliente y Config primero (un commit por entidad) y dime cuáles quedan pendientes. Presenta el plan antes de programar.
+```
+
+### Fase 3.3 – Horas pasadas no reservables y vencimiento automático
+```
+Contexto: AGENTS.md (secciones 2, 4b, 7 y 14, ya actualizadas) y el código actual. Fase 3.R terminada. Esta es la Fase 3.3. Trabaja con TDD (AGENTS.md 14.7): primero las pruebas en rojo (commit "test:"), luego el código ("feat:").
+
+Objetivo: (A) las horas que ya pasaron no se pueden reservar y el staff no ve lo que ya terminó; (B) las reservas vencidas se cierran solas.
+
+Diagnóstico verificado: validar_fecha solo compara fechas y validar_hora_en_franjas solo comprueba que la hora sea una franja del horario: hoy se puede reservar a las 12:00 pm cuando son las 4:00 pm.
+Además hoy() y ahora_local() usan datetime.now(): la hora del equipo, no la de Lima (en un servidor en la nube serían 5 horas de diferencia).
+
+Haz:
+1. Hora única: ajusta ahora_local() y hoy() para usar ZoneInfo("America/Lima") y reemplaza TODO uso suelto de datetime.now() / date.today() en app/ (grep).
+2. Migración migraciones/002_anticipacion_minima.sql (repetible) y schema.sql / seed.sql (esta fase lo autoriza): config_local.anticipacion_min_min SMALLINT NOT NULL DEFAULT 30 CHECK (anticipacion_min_min >= 0).
+   Campo en Administración > Configuración con su validación.
+3. Regla PURA (sin base de datos) franja_reservable(fecha, hora_inicio, minutos_franja, ahora, canal, anticipacion_min) → (bool, motivo). Web: reservable si el inicio de la franja >= ahora + anticipacion_min.
+   Staff: reservable si el FIN de la franja > ahora (puede usar la franja en curso). Días futuros: siempre; días pasados: nunca.
+4. horarios_con_semaforo(fecha) añade a cada hora el campo pasada. En /reservar las horas pasadas salen deshabilitadas con el texto "Ya pasó" (no se esconden sin explicar). Si hoy no queda ninguna:
+   "Hoy ya no hay horarios disponibles; elige otro día". Se valida SIEMPRE también en el servidor: crear_reserva_web, crear_reserva_staff y cambiar_hora rechazan una hora pasada con un mensaje claro
+   ("Esa hora ya pasó. Elige una hora posterior; se necesitan al menos 30 min de anticipación.").
+5. Pizarra del staff y API /api/v1/reservas/dia: para HOY, por defecto solo las franjas cuyo fin es posterior a la hora actual y las reservas que aún ocupan mesa; parámetro ver_pasadas=1 y un interruptor
+   "Ver horas anteriores" en la pantalla para ver el día completo. Otros días: completos. Solo AGREGAR campos a la API (ej. franjas_ocultas); no quitar ni renombrar ninguno.
+6. Vencimiento automático (única excepción al principio 2.1): servicio liberar_reservas_vencidas(ahora=None) con las reglas de AGENTS.md sección 7 (pendiente cuya hora pasó → rechazada "Vencida: nadie la atendió a tiempo";
+   confirmada cuya ocupación terminó (hora + fn_duracion_estadia) → no_llego "Automático: no se registró la llegada"; llego no cambia). Se llama de forma perezosa al consultar la pizarra, el semáforo público y la API del día,
+   y con `python manage.py liberar-vencidas`. Sin hilos ni tareas de fondo. Devuelve cuántas cerró. Todo el SQL va en ReservaDAO.
+7. Pruebas (TDD; las reglas puras SIN base de datos): franja_reservable en los bordes (justo en el límite de anticipación, franja en curso para staff, día futuro, día pasado); el servidor rechaza hora pasada por web, por staff y en cambiar_hora;
+   el semáforo marca las pasadas; la API oculta franjas pasadas y con ver_pasadas=1 las muestra; liberar_reservas_vencidas cierra solo lo que corresponde y NO toca llego, futuras ni otros días; es idempotente (la segunda llamada no cierra nada).
+8. Actualiza DICCIONARIO_BASE_DE_DATOS.md (columna nueva) y el README si cambia algún comando.
+
+No toques: capacidad (fn_carga_dia / fn_hay_cupo), tope por teléfono, pedidos.
+Criterio de terminado: son las 4 pm y en /reservar de hoy las horas anteriores aparecen deshabilitadas con "Ya pasó"; forzar una hora pasada por la URL devuelve un error claro; la pizarra de hoy empieza en la franja actual y el interruptor muestra el resto;
+una reserva confirmada de la mañana sin "Llegó" aparece como no llegó (automático) al recargar; pytest en verde. Prueba en el navegador y reporta. Presenta el plan antes de programar.
+```
+
+### Fase 3.4 – Identidad visual del cliente
+```
+Contexto: AGENTS.md (secciones 4, 11 y 12) y las plantillas actuales. Fase 3.3 terminada. Esta es la Fase 3.4. Es una fase visual: el comportamiento no cambia. Lo que tiene regla (validar datos de contacto y enlaces) se hace con TDD (AGENTS.md 14.7).
+
+Objetivo: que lo que ve el CLIENTE se sienta como un restaurante (llamativo, con accesos directos y datos del local) y que lo que usa el STAFF siga siendo sobrio y legible.
+
+Datos del local: NO inventes ninguno (nombre comercial, logo, colores, eslogan, WhatsApp, dirección, enlace de Google Maps, redes). Si falta alguno usa un marcador visible ("Pendiente: número de WhatsApp") y dímelo al reportar; yo te los doy.
+
+Haz:
+1. Migración migraciones/003_contacto_marca.sql (repetible) y schema.sql / seed.sql (autorizado): config_local.whatsapp_numero VARCHAR(15) NULL, direccion VARCHAR(150) NULL, maps_url VARCHAR(300) NULL, instagram_url VARCHAR(200) NULL, facebook_url VARCHAR(200) NULL.
+   En Administración > Configuración una sección "Contacto y marca" con validación en el servidor: whatsapp = 9 dígitos que empiezan en 9 (reusa la normalización de teléfono); maps_url, instagram_url y facebook_url deben empezar por https:// (rechaza javascript: y cualquier otro esquema).
+   Un context processor `marca` entrega estos datos a las plantillas públicas.
+2. Plantilla templates/base_cliente.html para TODAS las páginas públicas (/, /carta, /reservar, /pedir, /reserva/<token>, /pedido/<token>):
+   - Encabezado con logo (static/img/logo.png; si no existe, el nombre del local con la tipografía de títulos) y accesos directos grandes: Reservar mesa · Hacer pedido · Carta · Cómo llegar (maps_url) · WhatsApp (https://wa.me/51<número>).
+   - Pie con dirección, horario (de config_local), enlace al mapa, redes y WhatsApp.
+   - Botón flotante de WhatsApp abajo a la derecha (solo si hay número).
+   - Estilos en static/css/cliente.css con variables CSS (colores, tipografías, radios) para cambiar la marca en un solo lugar.
+   - Tipografía: una fuente de títulos con personalidad y una de texto muy legible. Propón 2 combinaciones con vista previa antes de aplicarlas; carga con font-display: swap y pila de respaldo (o alójalas en static/fonts/).
+3. Inicio (/): sección principal con nombre, eslogan y 3 botones (Reservar, Pedir, Ver carta); tarjetas "Cómo llegar", "Horario" y "Escríbenos"; sin números de capacidad ni datos internos.
+4. Las páginas del staff siguen con base.html (sobrio). En las páginas públicas NUNCA se muestra el menú de staff ni la insignia de rol: si hay sesión de staff abierta, solo una franja discreta "Sesión de staff abierta · Volver al panel".
+5. Móvil primero, buen contraste, imágenes con loading="lazy", sin librerías nuevas aparte de las fuentes. Favicon y theme-color con la marca.
+6. Pruebas (TDD en lo que tiene regla): validación de whatsapp_numero y de las URL (https obligatorio, esquemas peligrosos rechazados); las páginas públicas responden 200 SIN menú de staff aunque haya un staff logueado; el enlace wa.me se arma bien; sin número configurado no aparece el botón flotante.
+
+No toques: reglas de reservas ni pedidos, ni la API.
+Criterio de terminado: en el celular (modo móvil del navegador) el inicio se ve como un restaurante; los botones Reservar, Pedir, Cómo llegar y WhatsApp funcionan; el staff sigue viendo su panel sobrio y las páginas públicas no muestran el menú de staff aunque esté logueado.
+Prueba y reporta con capturas. Presenta el plan antes de programar.
+```
+
+### Fase 3.5 – Carta y pedido en celular (categorías, desplegables, carrito)
+```
+Contexto: AGENTS.md (secciones 3, 8, 11 y 12), app/templates/publico/pedir.html y carta.html. Fase 3.4 terminada. Esta es la Fase 3.5. TDD en lo que tiene regla (AGENTS.md 14.7).
+
+Objetivo: elegir platos desde el celular debe ser corto y fácil (la lista actual es muy larga), y debe escalar a más o menos platos y a imágenes después. El formulario sigue enviando los MISMOS campos al servidor
+(items como JSON, nombre, telefono, correo, nota, acepta_datos, honeypot y CSRF): el backend de pedidos no cambia. Stack: Bootstrap 5 y JavaScript vanilla, sin frameworks nuevos.
+
+Haz:
+1. Barra de categorías horizontal pegada arriba (chips con scroll lateral) y debajo secciones DESPLEGABLES por categoría (acordeón; abierta la categoría elegida, las demás cerradas para que la página no sea larga).
+   Al tocar un chip se abre y desplaza a esa categoría. Buscador por nombre o por número de plato (reusa la normalización sin tildes).
+2. Cada plato en una tarjeta compacta: nombre, número si tiene, descripción corta, precio y control +/−. Los agotados se ven apagados y no se pueden sumar. La tarjeta reserva un espacio para imagen (hoy un cuadro neutro con ícono;
+   la Fase 3.9 lo rellena) y debe verse bien sin ella.
+3. Barra flotante inferior "Ver pedido · N platos · S/ total" apenas haya algo. Al tocarla abre un panel (offcanvas de Bootstrap) con las líneas (cambiar cantidad, quitar), la nota del pedido y el total estimado
+   (el precio real lo vuelve a calcular el servidor).
+4. Segundo paso en el panel: datos (nombre, teléfono de 9 dígitos obligatorio, correo opcional, consentimiento) y botón "Enviar pedido". Se mantienen las validaciones del servidor.
+5. "Complementa tu pedido": migración migraciones/004_categoria_complemento.sql (repetible) y schema.sql / seed.sql (autorizado): categoria.es_complemento BOOLEAN NOT NULL DEFAULT FALSE, con casilla en Carta Staff.
+   En el panel del carrito, antes de enviar, un bloque con hasta 3 platos disponibles de categorías marcadas como complemento (bebidas, postres...) y botón +. Si no hay categorías marcadas, el bloque no aparece.
+6. La carta pública (/carta) usa el mismo estilo de categorías desplegables, solo lectura.
+7. El carrito se conserva en sessionStorage para que recargar no lo pierda y se limpia al enviar con éxito. No guardes datos personales en el navegador.
+8. Respeta el banner "Sin conexión" y data-requiere-conexion. Accesible: botones con aria-label y foco visible. Estilos con las variables de cliente.css (Fase 3.4).
+9. Pruebas: POST a /pedir con items válidos crea el pedido igual que antes; plato agotado rechazado; la página renderiza las categorías y solo los platos activos; el bloque de complementos solo muestra platos disponibles de categorías marcadas
+   (regla pura probada sin base de datos).
+
+Criterio de terminado: desde el celular (modo móvil) armo un pedido de 3 platos de 2 categorías sin hacer scroll interminable, ajusto cantidades, agrego un complemento, lleno mis datos y lo envío; aparece en la cola del staff como Pendiente.
+Prueba en el navegador y reporta con capturas. Presenta el plan antes de programar.
+```
+
+### Fase 3.6 – Cocina: imprimir y recojo primero
+```
+Contexto: AGENTS.md (secciones 8 y 10, ya actualizadas) y el código actual. Fase 3.5 terminada. Esta es la Fase 3.6. Trabaja con TDD (AGENTS.md 14.7).
+
+Objetivo: la pantalla de cocina imprime pedidos igual que la cola, y los pedidos para llevar se ven primero cuando están en cocina.
+
+Haz:
+1. Orden (TDD, en el DAO/servicio, no en JavaScript): en "En cocina", "Listos" y en el tablero de cocina, primero los pedidos de tipo recojo y luego los local, cada grupo por preparacion_en y luego por pedido_id.
+   En "Pendientes" y "Por cobrar" el orden NO cambia (por llegada). Prueba primero con pedidos mezclados.
+2. Etiqueta visible "PARA LLEVAR" en las tarjetas de recojo y "LOCAL" en las demás, en cola y cocina.
+3. Imprimir desde cocina: en cada tarjeta de cocina.html el mismo botón "Imprimir ticket" que ya existe en la cola (misma ruta y plantilla: /staff/pedido/<id>/ticket). Además, en la pantalla de cocina la casilla
+   "Imprimir automáticamente los pedidos nuevos de esta pantalla" (apagada por defecto, recuerda su elección): imprime cada pedido nuevo UNA sola vez (recuerda los ya impresos en sessionStorage) y funciona con la tiquetera configurada con --kiosk-printing
+   (ver GUIA_IMPRESION.md). Junto a la casilla muestra la advertencia: "Activa la impresión automática en un solo equipo (cocina o caja) para no imprimir duplicados."
+   Comparte el JS común con js_pedidos.js sin duplicar código (muévelo a un archivo estático compartido).
+4. No cambies estados, cobros ni la regla de cocina solo cuando está cobrado.
+5. Pruebas: orden de la cola y de cocina con pedidos mezclados (recojo primero); las transiciones y el cobro siguen igual; la ruta del ticket responde para un pedido en cocina.
+
+Criterio de terminado: con un recojo y dos locales en cocina, el recojo aparece primero y con la etiqueta; cada tarjeta de cocina tiene "Imprimir ticket"; con la casilla activa, un pedido nuevo en cocina se imprime una vez.
+Prueba en el navegador y reporta. Presenta el plan antes de programar.
+```
+
+### Fase 3.7 – Pago con comprobante del cliente y un solo botón
+```
+Contexto: AGENTS.md (secciones 4b, 8, 12 y 14, ya actualizadas) y el código actual. Esta es la Fase 3.7. Trabaja con TDD (AGENTS.md 14.7) y con la capa DAO (ComprobanteDAO en app/dao/; los servicios y las rutas no escriben SQL).
+
+Objetivo: el cliente adjunta una captura de su pago; el staff la ve, verifica en su Yape real que llegó el monto exacto y con UN botón el pedido pasa a cocina.
+La captura es solo apoyo: nunca aprueba el pago ni mueve el pedido por sí sola.
+
+Haz:
+1. Crea migraciones/005_comprobante_pago.sql (repetible) y actualiza schema.sql (esta fase lo autoriza). Tabla comprobante_pago:
+   comprobante_id INT identity PK; pedido_id INT NOT NULL FK; contenido BYTEA NOT NULL (la imagen ya reducida, nunca el archivo original); tipo_mime VARCHAR(20) NOT NULL;
+   bytes INT NOT NULL; estado VARCHAR(10) NOT NULL DEFAULT 'pendiente' CHECK IN ('pendiente','aprobado','rechazado'); motivo_rechazo VARCHAR(200) NULL;
+   subido_en TIMESTAMPTZ NOT NULL DEFAULT now(); revisado_por INT NULL FK personal; revisado_en TIMESTAMPTZ NULL. Índice por pedido_id.
+2. app/servicios/archivos.py (nuevo, reutilizable): recibe el archivo subido, valida tamaño (máx 5 MB), verifica con Pillow que es una imagen real JPEG, PNG o WebP
+   (no confiar en extensión ni en el tipo declarado), la reconvierte a JPEG con lado máximo 1200 px, calidad cercana a 70 y SIN metadatos (EXIF/GPS), y devuelve los bytes y los datos para guardarlos en la base (NO en el disco). Configura MAX_CONTENT_LENGTH en config.py y maneja el error 413 con mensaje claro.
+2b. Retención: agrega el comando de manage.py `limpiar-comprobantes [--dias 30]`, que borra los comprobantes de pedidos ya entregados, rechazados o cancelados con más de N días.
+   Todas las consultas de listas y colas deben EXCLUIR la columna contenido (nunca SELECT *).
+3. Cliente, en /pedido/<token>, cuando el pedido está aceptado y por cobrar: junto a las instrucciones de Yape, un formulario "Adjuntar comprobante" (input de imagen, permite cámara en celular, con CSRF y honeypot).
+   Ruta POST /pedido/<token>/comprobante. Máximo 3 comprobantes pendientes por pedido. Muestra el estado del último: "Recibido, el local lo está verificando" o "Rechazado: <motivo>" (permite subir otro).
+   Un token solo puede subir a su propio pedido. La página sigue refrescándose sola.
+4. Staff:
+   - Ruta GET /staff/comprobante/<id> con @requiere_rol("admin","empleado") que lee la imagen de la base y la entrega (nunca desde static/ ni del disco). Cabeceras para que no se cachee en proxys públicos.
+   - Cola, columna "Por cobrar": insignia "Comprobante recibido" en las tarjetas que lo tengan, y esas tarjetas primero dentro de la columna. El botón de la tarjeta dice "Revisar pago".
+   - Detalle del pedido: muestra la imagen grande, el total, el número/titular de Yape y el texto "Abre tu Yape y confirma que llegó S/ <saldo>". Botones:
+       a) "Confirmar pago y enviar a cocina": UN clic, sin ventana emergente y sin escribir nada. Registra el pago por el saldo completo con medio 'yape', marca el comprobante como aprobado
+          (revisado_por y revisado_en) y el pedido pasa a en_preparacion (reusa registrar_pago; no dupliques la lógica).
+       b) "Cobrar en efectivo": con una confirmación simple, registra el saldo completo con medio 'efectivo' y pasa a cocina.
+       c) "Rechazar comprobante": pide motivo, marca el comprobante rechazado; el pedido sigue aceptado y el cliente puede subir otro.
+       d) Enlace pequeño "Otro medio o pago parcial" que abre el modal actual (no lo elimines: conserva esa función). El campo "referencia" sale del flujo normal.
+5. API /api/v1/pedidos/cola: agrega (solo agregar) el campo tiene_comprobante por pedido.
+6. Un pedido nunca pasa a cocina sin pago registrado por el staff (regla actual intacta). No pagar de más.
+7. Pruebas con pytest: subida válida; archivo que no es imagen (aunque se llame .jpg) rechazado; archivo mayor a 5 MB rechazado; un token no puede subir al pedido de otro;
+   /staff/comprobante/<id> exige sesión de staff; "Confirmar pago y enviar a cocina" registra el saldo y deja el pedido en en_preparacion; rechazar permite subir otro; no se puede pagar de más;
+   los metadatos EXIF no sobreviven al guardado; limpiar-comprobantes borra solo comprobantes antiguos de pedidos cerrados.
+
+No toques: reservas, estados de pedido, la regla "solo a cocina cuando queda cobrado".
+Criterio de terminado: como cliente pido, el staff acepta, subo una captura desde el celular; en la cola aparece "Comprobante recibido"; el staff abre el detalle, ve la imagen, pulsa un botón y el pedido está en cocina.
+Rechazo un comprobante y puedo subir otro. Prueba en el navegador y reporta. Presenta el plan antes de programar.
+```
+
+### Fase 3.8 – WhatsApp sin costo: mensajes listos y botones
+```
+Contexto: AGENTS.md (secciones 4b, 9 y 14, ya actualizadas), WHATSAPP_COSTOS.md y el código actual (enlace_whatsapp en utils.py, menú ⋮ de pizarra.html y js_pedidos.js). Fase 3.7 terminada. Esta es la Fase 3.8. TDD obligatorio (AGENTS.md 14.7).
+
+Objetivo: comunicar al cliente por WhatsApp cada paso de su reserva o pedido con mensajes fáciles de leer, amables y con emojis, SIN usar la API de pago: todo con enlaces wa.me que abren WhatsApp con el texto ya escrito.
+
+Haz:
+1. servicios/mensajes.py: funciones PURAS (sin base de datos ni Flask) que devuelven el texto: reserva_recibida, reserva_confirmada, reserva_rechazada(motivo), reserva_cambio_hora(antes, ahora), pedido_recibido, pedido_aceptado(total, datos de Yape, enlace para subir el comprobante),
+   pedido_listo, pedido_entregado (agradecimiento), pedido_rechazado(motivo). Estilo: saludo con el nombre, 1 a 3 emojis bien puestos, líneas cortas, datos clave en negrita de WhatsApp (*así*), código de la reserva o número del pedido,
+   enlace de seguimiento (/reserva/<token> o /pedido/<token>), nombre del local, máximo ~600 caracteres, sin la palabra "None" ni campos vacíos. Una sola invitación suave a pedir más, en pedido_entregado ("¿Se te antojó algo más? Mira la carta: <enlace>"); no en los demás mensajes.
+   Escribe PRIMERO las pruebas (contienen código/nombre/enlace, no contienen "None", no pasan del largo máximo, se codifican bien en la URL) y haz commit "test:" antes del código.
+2. Botón "Avisar por WhatsApp" (verde, grande) que aparece justo después de cada acción del staff (confirmar, rechazar, cambiar hora; aceptar, rechazar, listo, entregado) y abre WhatsApp con el mensaje del estado correspondiente.
+   El menú ⋮ conserva "WhatsApp", ahora con el mensaje correcto según el estado actual. No uses la tabla notificacion ni ninguna API.
+3. Botones para el cliente, con el número de config_local.whatsapp_numero: en /reserva/<token> y /pedido/<token> "Enviar por WhatsApp al local" (texto prellenado con código y datos) y, en pedidos por cobrar,
+   "Ya pagué: enviar captura por WhatsApp" como alternativa a subir el comprobante en la página. Sin número configurado, estos botones no aparecen.
+4. Reemplaza los textos de WhatsApp que hoy están escritos dentro de pizarra.html y js_pedidos.js por llamadas a mensajes.py (vía una ruta o dato de la API), para que haya UN solo lugar con los textos.
+5. Pruebas de integración: tras confirmar una reserva el botón aparece con el enlace wa.me correcto y el mensaje de "confirmada"; un teléfono sin 9 dígitos no genera enlace; sin whatsapp_numero no aparecen los botones del cliente.
+
+No toques: la tabla notificacion, el correo automático ni la API oficial (quedan para la 5A).
+Criterio de terminado: confirmo una reserva y con un toque se abre WhatsApp con un mensaje amable y claro; marco un pedido listo y abre el mensaje de "listo"; el cliente puede escribirle al local desde su página de seguimiento.
+Prueba en el navegador y reporta con ejemplos de los mensajes. Presenta el plan antes de programar.
+```
+
+### Fase 3.9 – Imagen por plato (opcional; solo si hay fotos reales)
+```
+Contexto: AGENTS.md y app/servicios/archivos.py (Fase 3.7). Esta es la Fase 3.9. Trabaja con TDD (AGENTS.md 14.7) y con la capa DAO (PlatoImagenDAO en app/dao/).
+
+Objetivo: cada plato puede tener una foto opcional que se ve en la carta pública y en /pedir.
+
+Haz:
+1. migraciones/006_plato_imagen.sql (repetible) y schema.sql: tabla plato_imagen (plato_id INT PK FK a plato, contenido BYTEA NOT NULL, tipo_mime VARCHAR(20) NOT NULL, actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()).
+   Es una tabla aparte para que las consultas de plato no arrastren los bytes. Sin fila = plato sin imagen.
+2. Reutiliza servicios/archivos.py (mismas validaciones y quitar metadatos) con lado máximo 800 px y calidad ajustada para que cada imagen pese menos de 200 KB. Se guarda en la base, no en el disco.
+3. Carta Staff: al crear o editar un plato, campo opcional "Foto" y botón para quitarla. Al reemplazarla se sobrescribe la fila; al quitarla se borra.
+4. Ruta pública GET /img/plato/<plato_id> que entrega la foto con cabeceras de caché; si no hay foto, devuelve un ícono neutro. Estas imágenes SÍ son públicas (a diferencia de los comprobantes).
+5. Mostrar la imagen en /carta y en las tarjetas de /pedir (con carga diferida, loading="lazy"). Sin imagen, la tarjeta sigue viéndose bien.
+
+Pruebas: subida válida; archivo no imagen rechazado; reemplazar sobrescribe y quitar elimina la imagen; /img/plato/<id> devuelve imagen o ícono; la carta pública carga sin fotos.
+Criterio de terminado: subo la foto de dos platos desde Carta Staff y aparecen en la carta pública y en /pedir; los demás platos siguen bien sin foto. Prueba en el navegador y reporta. Presenta el plan antes de programar.
+```
+
+---
+
 ## Fase 4 – Cierre del primer avance (instalable, impresión y demostración)
 ```
 Contexto: AGENTS.md y schema.sql. Fases 0 a 3 terminadas. Esta es la Fase 4. NO se implementan notificaciones automáticas ni impresión automática desde el servidor (son del proyecto final).
@@ -218,6 +477,8 @@ Presenta el plan antes de programar.
 # PROYECTO FINAL (borradores: revisar cuando llegue el momento)
 
 ## Fase 5A – Notificaciones (correo y WhatsApp en un toque)
+> Nota (03/11/2026): los botones de WhatsApp con mensaje ya redactado (`wa.me`) se adelantaron a la Fase 3.8 y los textos viven en `servicios/mensajes.py`.
+> La 5A solo agrega el correo automático, el registro en la tabla `notificacion` y, si se decide pagar, la API oficial de WhatsApp (ver `WHATSAPP_COSTOS.md`).
 ```
 Contexto: AGENTS.md (sección 9 completa) y schema.sql. Avance terminado. Esta es la Fase 5A.
 

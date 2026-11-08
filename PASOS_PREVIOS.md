@@ -70,7 +70,7 @@ La dueña respuesta:
 - Aforo	Máximo de personas que caben en el local a la vez	60 personas	aforo_personas
 - Número de mesas	Cuántas mesas tiene el salón	15 mesas	total_mesas
 - Personas por mesa	Cuántas personas se sientan en una mesa normal; con esto se calcula cuántas mesas ocupa un grupo	4 personas personas_por_mesa
-- Duración de una estadía	Cuánto tiempo suele ocupar una mesa un grupo	90 minutos	duracion_estadia_min
+- Duración en mesa por tamaño del grupo	Cuánto tiempo suele ocupar una mesa un grupo: depende de cuántos son	1–3 pax: 30 min · 4–7 pax: 60 min · 8 o más: 90 min	duracion_1_3_min, duracion_4_7_min, duracion_8_mas_min
 - Horario	Hora de apertura y de cierre	el horario varia, abre siempre a la misma hora los dias que abre y lo mismo que cuando cierra	hora_apertura, hora_cierre
 - Tolerancia	Cuánto espera el local a un cliente con reserva antes de marcarlo en rojo	20 minutos	tolerancia_min
 - % de ocupación para la alerta	Desde qué porcentaje de llenado la franja se pone en amarillo (“a punto de llenarse”)	80 %	umbral_alerta_pct

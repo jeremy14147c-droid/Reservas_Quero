@@ -44,7 +44,10 @@ CREATE TABLE config_local (
   aforo_personas         INT NOT NULL CHECK (aforo_personas > 0),
   total_mesas            INT NOT NULL CHECK (total_mesas > 0),
   personas_por_mesa      INT NOT NULL CHECK (personas_por_mesa > 0),
-  duracion_estadia_min   INT NOT NULL CHECK (duracion_estadia_min > 0),
+  -- El tiempo en mesa DEPENDE del tamaño del grupo (los tres editables en Configuración):
+  duracion_1_3_min       INT NOT NULL DEFAULT 30 CHECK (duracion_1_3_min > 0),   -- 1 a 3 personas
+  duracion_4_7_min       INT NOT NULL DEFAULT 60 CHECK (duracion_4_7_min > 0),   -- 4 a 7 personas
+  duracion_8_mas_min     INT NOT NULL DEFAULT 90 CHECK (duracion_8_mas_min > 0), -- 8 en adelante
   franja_min             INT NOT NULL DEFAULT 30 CHECK (franja_min IN (15,30,60)),
   tolerancia_min         INT NOT NULL CHECK (tolerancia_min >= 0),   -- solo referencia: pasado este tiempo la app ALERTA; el staff decide si libera o reprograma
   umbral_preparacion_min INT NOT NULL CHECK (umbral_preparacion_min > 0),   -- cocina: pasado este tiempo el pedido se resalta en rojo
@@ -227,10 +230,24 @@ SELECT c.cliente_id,
            AND r.creado_en > now() - interval '24 hours')  AS reservas_web_24h   -- se compara con config_local.max_reservas_web_por_telefono
 FROM cliente c;
 
+-- Duración de la estadía SEGÚN el tamaño del grupo (única fuente de verdad).
+-- Los valores salen de config_local y los edita la dueña en Configuración.
+CREATE OR REPLACE FUNCTION fn_duracion_estadia(p_personas INT)
+RETURNS INT STABLE AS $$
+  SELECT CASE
+           WHEN p_personas <= 3 THEN c.duracion_1_3_min      -- grupos de 1 a 3
+           WHEN p_personas <= 7 THEN c.duracion_4_7_min      -- grupos de 4 a 7
+           ELSE c.duracion_8_mas_min                          -- 8 en adelante
+         END
+  FROM config_local c WHERE c.config_id = 1;
+$$ LANGUAGE sql;
+
 -- Carga de reservas por franja para un día (pizarra digital).
 -- Cuenta solo reservas 'confirmada' y 'llego' (las pendientes NO reducen capacidad;
 -- 'no_llego', 'cancelada' y 'rechazada' liberan el cupo).
--- Una reserva ocupa mesa durante toda su estadía, por eso aparece en cada franja que cubre.
+-- Una reserva ocupa mesa durante SU duración (según su tamaño de grupo): fn_duracion_estadia,
+-- por eso aparece en cada franja que cubre. Un grupo de 8 ocupa 3 franjas de 30 min,
+-- uno de 5 ocupa 2 y uno de 2 ocupa 1.
 -- Mesas requeridas por reserva = personas / personas_por_mesa, redondeado hacia arriba.
 -- "nivel" alimenta las alertas del staff (el staff NO queda bloqueado):
 --   'ok'       = por debajo del umbral de alerta
@@ -258,7 +275,7 @@ LANGUAGE sql STABLE AS $$
   activas AS (
     SELECT r.reserva_id, r.cantidad_personas,
            (r.fecha + r.hora) AS ini,
-           (r.fecha + r.hora) + make_interval(mins => c.duracion_estadia_min) AS fin,
+           (r.fecha + r.hora) + make_interval(mins => fn_duracion_estadia(r.cantidad_personas)) AS fin,
            CEIL(r.cantidad_personas::numeric / c.personas_por_mesa)::INT AS mesas_req
     FROM reserva r, c
     WHERE r.fecha = p_fecha
@@ -308,6 +325,6 @@ LANGUAGE sql STABLE AS $$
        AND f.mesas + CEIL(p_personas::numeric / c.personas_por_mesa)::INT <= f.limite_mesas), FALSE)
   FROM fn_carga_dia(p_fecha, p_excluir_reserva) f, config_local c
   WHERE c.config_id = 1
-    AND (p_fecha + f.franja_inicio) < (p_fecha + p_hora) + make_interval(mins => c.duracion_estadia_min)
+    AND (p_fecha + f.franja_inicio) < (p_fecha + p_hora) + make_interval(mins => fn_duracion_estadia(p_personas))
     AND (p_fecha + f.franja_fin)    > (p_fecha + p_hora);
 $$;
