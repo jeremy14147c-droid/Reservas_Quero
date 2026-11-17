@@ -25,21 +25,21 @@ Material de la Semana 14 (Pruebas de Seguridad + laboratorio de auditoría cruza
 | Mensaje de login | Usuario inexistente y contraseña incorrecta devuelven el **mismo** texto. |
 | Token de cierre | Al cerrar sesión en el navegador, volver a una página protegida redirige al login. |
 
-**Lo que hay que corregir (resumen):**
+**Lo que se diagnosticó y su estado actual (Fases S1 y S2 aplicadas):**
 
-| # | Hallazgo | Severidad |
-|---|---|---|
-| H-1 | La sesión **no se puede revocar**: una cookie copiada antes de cerrar sesión sigue funcionando (y vive 31 días). | **Alto** |
-| H-2 | **No hay bloqueo** por intentos fallidos de login. | Medio |
-| H-3 | **Redirección abierta** en el login (`?next=https://sitio-externo`). | Medio |
-| H-4 | El **tiempo de respuesta** revela si un correo existe (~9 ms vs ~88 ms). | Medio |
-| H-5 | La cookie de sesión no lleva `Secure` ni `SameSite`. | Medio |
-| H-6 | No hay **cabeceras de seguridad** (`X-Frame-Options`, `nosniff`, etc.). | Bajo |
-| H-7 | `/reserva/<texto>` y `/pedido/<texto>` responden **500** en vez de 404. | Bajo |
-| H-8 | El logout se hace por **GET** (un enlace puede cerrar tu sesión). | Bajo |
-| H-9 | Contraseña mínima de **6** caracteres (leído en el código, no ejecutado). | Bajo |
-| H-10 | `SECRET_KEY` tiene un valor **por defecto** público si falta la variable (**verifica en Render**). | Condicional |
-| H-11 | Un empleado puede cambiar precios y no queda **registro** de quién lo hizo. | Decisión de negocio |
+| # | Hallazgo | Severidad | Estado actual |
+|---|---|---|---|
+| H-1 | La sesión **no se puede revocar**: una cookie copiada antes de cerrar sesión sigue funcionando. | **Alto** | **RESUELTO** (sesión revocable con `sesion_version`). |
+| H-2 | **No hay bloqueo** por intentos fallidos de login. | Medio | **RESUELTO** (bloqueo por 5 fallos en 10 min por correo y 20 por IP). |
+| H-3 | **Redirección abierta** en el login (`?next=https://sitio-externo`). | Medio | **RESUELTO** (función `destino_seguro` restringe a rutas internas). |
+| H-4 | El **tiempo de respuesta** delata si un correo existe (~9 ms vs ~88 ms). | Medio | **RESUELTO** (cálculo de hash falso `HASH_FALSO_DUMMY` iguala los tiempos). |
+| H-5 | La cookie de sesión no lleva `Secure` ni `SameSite`. | Medio | **RESUELTO** (`SameSite=Lax`, `Secure` en producción y vida de 12 h). |
+| H-6 | No hay **cabeceras de seguridad** (`X-Frame-Options`, `nosniff`, etc.). | Bajo | **RESUELTO** (cabeceras nosniff, DENY, CSP, Permissions-Policy en `after_request`). |
+| H-7 | `/reserva/<texto>` y `/pedido/<texto>` responden **500** en vez de 404. | Bajo | **RESUELTO** (convertidor `<uuid:token>` responde 404 antes de BD). |
+| H-8 | El logout se hace por **GET** (un enlace puede cerrar tu sesión). | Bajo | **RESUELTO** (logout exclusivamente por POST con CSRF, GET da 405). |
+| H-9 | Contraseña mínima de **6** caracteres. | Bajo | **RESUELTO** (política mínima de 10 caracteres y bloqueo de claves comunes). |
+| H-10 | `SECRET_KEY` tiene un valor **por defecto** público si falta la variable. | Condicional | **RESUELTO** (validación bloquea arranque en producción si falta o es corta). |
+| H-11 | Un empleado puede cambiar precios y no queda **registro** de quién lo hizo. | Decisión de negocio | Pendiente para Fase S3 (bitácora Semana 16). |
 
 No encontré hallazgos **Críticos**. Eso es bueno, pero solo cubre lo que probé.
 
@@ -121,11 +121,11 @@ Sin cuentas, el riesgo del cliente es menor, pero hay cosas que cuidar:
 | PS-02 | Autorización | Panel de administración | Anónimo abre `/admin/personal`, `/admin/config`, `/staff/reservas`; llama `/api/v1/reservas/dia`. Con el empleado de prueba abre `/admin/personal` y envía POST a crear plato y crear personal. | Redirige al login o muestra acceso denegado | Anónimo: **302** al login (API: **401**). Empleado: **403** en las páginas y en los POST de admin. POST sin token CSRF: **400**. | **Sí** | |
 | PS-03 | Inyección | Credenciales y buscador | `' OR '1'='1' -- ` (con espacio al final) en correo y en contraseña; en el buscador de platos del staff; en el nombre del formulario `/reservar`. | No inicia sesión; sin error técnico | Login: vuelve a mostrar el formulario (**200**), sin sesión. Buscador y formulario: sin error técnico. La tabla `reserva` sigue existiendo. | **Sí** | |
 | PS-04 | Cifrado | Credenciales | Ver la columna `password_hash` de `personal` en pgAdmin o `psql`. | Un hash largo e ilegible | `scrypt:32768:8:1$6JuKj...` (hash `scrypt` con sal aleatoria) | **Sí** (ver nota) | |
-| PS-05 | Sesión | Sesión activa | a) Iniciar sesión, cerrar sesión y abrir `/staff/reservas`. b) Copiar el valor de la cookie `session`, cerrar sesión, volver a poner esa cookie y recargar. | Pide iniciar sesión en ambos casos | a) **302** al login. b) **200**: el panel se abre otra vez. | **No** (b) | |
+| PS-05 | Sesión | Sesión activa | a) Iniciar sesión, cerrar sesión y abrir `/staff/reservas`. b) Copiar el valor de la cookie `session`, cerrar sesión, volver a poner esa cookie y recargar. | Pide iniciar sesión en ambos casos | a) **302** al login. b) **302**: la sesión previa queda invalidada en el servidor mediante `sesion_version`. | **Sí** | |
 | PS-06 | Autorización (propio) | Funciones de alto impacto del admin | Con el empleado de prueba: crear personal y crear plato. | Acceso denegado | **403** | **Sí** | |
-| PS-07 | Validación de entrada (propio) | Páginas públicas de seguimiento | Abrir `/reserva/1` y `/pedido/1`. | Página 404 | **500** (error del servidor) | **No** | |
-| PS-08 | Autenticación (propio) | Login | Iniciar sesión con `/auth/login?next=https://evil.example/robo`. | Ignora el destino externo | Redirige a `https://evil.example/robo` (también con `//evil.example`) | **No** | |
-| PS-01 | Autenticación | Credenciales | a) Usuario inexistente. b) Usuario de prueba con contraseña incorrecta 6 veces. c) Comparar los mensajes. Luego iniciar sesión con la contraseña correcta. | Mismo mensaje y bloqueo temporal | Mismo mensaje en a) y b): "Credenciales incorrectas o cuenta inactiva." **Sin bloqueo**: tras los 6 fallos el login correcto entró (**302**). | **No** | |
+| PS-07 | Validación de entrada (propio) | Páginas públicas de seguimiento | Abrir `/reserva/1` y `/pedido/1`. | Página 404 | **404** (convertidor `<uuid:token>` rechaza antes de tocar la BD). | **Sí** | |
+| PS-08 | Autenticación (propio) | Login | Iniciar sesión con `/auth/login?next=https://evil.example/robo`. | Ignora el destino externo | Ignora el enlace malicioso y redirige a la ruta interna por defecto. | **Sí** | |
+| PS-01 | Autenticación | Credenciales | a) Usuario inexistente. b) Usuario de prueba con contraseña incorrecta 6 veces. c) Comparar los mensajes. Luego iniciar sesión con la contraseña correcta. | Mismo mensaje y bloqueo temporal | Mismo mensaje en a) y b) con tiempo parejo (hash falso H-4). **Con bloqueo**: al 5to fallo bloquea temporalmente por 10 min. | **Sí** | |
 
 **Ejecuta PS-01 al final** (así lo pide la guía), por si algún día hay bloqueo.
 
