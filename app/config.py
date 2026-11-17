@@ -9,6 +9,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def validar_secret_key(secret_key: str | None, produccion: bool = False) -> bool:
+    """Valida que SECRET_KEY sea segura en entorno de producción (H-10)."""
+    if produccion:
+        if not secret_key or secret_key == "dev-secret-key-cambiar-en-produccion":
+            raise ValueError("En producción, SECRET_KEY no puede ser la clave de desarrollo por defecto.")
+        if len(secret_key) < 32:
+            raise ValueError("En producción, SECRET_KEY debe tener al menos 32 caracteres.")
+    return True
+
+
 class Config:
     """Configuración base de Flask."""
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-cambiar-en-produccion")

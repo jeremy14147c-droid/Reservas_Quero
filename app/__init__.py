@@ -3,7 +3,7 @@ from flask import Flask, render_template, request
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
 
-from app.config import Config
+from app.config import Config, validar_secret_key
 from app.db import cerrar_db
 from app.auth.usuario import cargar_usuario, obtener_usuario_actual
 from app.api.helpers import respuesta_error
@@ -18,6 +18,9 @@ def create_app(config_class=Config):
     """Crea y configura una instancia de la aplicación Flask."""
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # H-10: Validar que en producción la clave secreta sea robusta y no la por defecto
+    validar_secret_key(app.config.get("SECRET_KEY"), app.config.get("PRODUCCION", False))
 
     # Configurar ProxyFix solo en producción para leer IP real del cliente tras proxy/Render (H-2)
     if app.config.get("PRODUCCION"):
@@ -45,6 +48,27 @@ def create_app(config_class=Config):
             "utils_hora12": formato_hora_12h,
             "utils_fecha": formato_fecha_ddmm
         }
+
+    # H-6: Cabeceras HTTP de seguridad en cada respuesta
+    @app.after_request
+    def agregar_cabeceras_seguridad(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if app.config.get("PRODUCCION"):
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+            "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "connect-src 'self';"
+        )
+        response.headers["Content-Security-Policy"] = csp
+        return response
 
     # Registrar blueprints
     from app.publico import publico_bp

@@ -93,10 +93,10 @@ def reservar():
     )
 
 
-@publico_bp.route("/reserva/<token>")
+@publico_bp.route("/reserva/<uuid:token>")
 def reserva_estado(token):
     """Seguimiento público de la reserva por token UUID (se refresca sola)."""
-    reserva = servicio_reservas.obtener_reserva_publica(token)
+    reserva = servicio_reservas.obtener_reserva_publica(str(token))
     if not reserva:
         return render_template("errores/404.html"), 404
     config = _config_basica()
@@ -144,10 +144,10 @@ def pedir():
     return render_template("publico/pedir.html", config=config, carta=carta_datos)
 
 
-@publico_bp.route("/pedido/<token>")
+@publico_bp.route("/pedido/<uuid:token>")
 def pedido_estado(token):
     """Seguimiento público del pedido por token UUID (se refresca sola cada 15 s)."""
-    pedido = servicio_pedidos.obtener_pedido_publico(token)
+    pedido = servicio_pedidos.obtener_pedido_publico(str(token))
     if not pedido:
         return render_template("errores/404.html"), 404
     config = _config_basica()
