@@ -3,9 +3,9 @@
 Archivo para el equipo y el agente. Si algo contradice a otro documento del repo, manda este archivo y luego `AGENTS.md`.
 
 ## 1. Dónde estamos
-- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por tamaño de grupo y pizarra clara), **3.0** (higiene de Git: .venv removido del historial de Git) y **preparación para nube** (hora unificada de Lima con ZoneInfo y tzdata). 52 pruebas en verde.
-- La rama `main` ya tiene todo integrado y la base de datos en la nube (**Neon**) ya fue creada, poblada y verificada con `schema.sql`, `seed.sql` y el usuario admin.
-- Siguiente paso: Subir los commits a GitHub (`git push origin main --tags`), conectar el servicio web en Render, y arrancar la **Fase 3.R** (capa DAO con TDD). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
+- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), y **Fases S1 + S2 de Seguridad (Semana 14)**: sesión revocable, mitigación de temporización, bloqueo por intentos fallidos, redirección segura, logout por POST, política de contraseñas (10+ caracteres), cabeceras de seguridad y convertidor UUID en rutas públicas. **62 pruebas en verde**.
+- La rama `main` tiene todo integrado y la migración `002_seguridad_login_sesion.sql` ya fue aplicada tanto en local como en Neon.
+- Siguiente paso: **Fase 3.R** (capa DAO real y pruebas unitarias sin BD). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
 
 ## 2. Problemas detectados (verificados)
 1. [RESUELTO en 3.0] `.venv/` ya no está versionado en Git (se eliminó del índice con `git rm -r --cached .venv`). `.env` no está en el historial (revisado).
@@ -27,7 +27,8 @@ Archivo para el equipo y el agente. Si algo contradice a otro documento del repo
 | Fase | Qué | Depende de | Estado |
 |---|---|---|---|
 | 3.0 | Higiene de Git e integración a `main` | – | Completado en `main` |
-| D | Despliegue en Neon y Render | 3.0 | Neon listo / Render en proceso |
+| D | Despliegue en Neon y Render | 3.0 | Desplegado y verificado |
+| S1-S2 | Seguridad OWASP (login, sesión revocable, cabeceras, UUID) | D | Completado (62 tests en verde) |
 | 3.R | Capa DAO real y arranque del TDD | 3.0 | Pendiente |
 | 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R | Pendiente |
 | 3.4 | Identidad visual del cliente | 3.3 | Pendiente |
