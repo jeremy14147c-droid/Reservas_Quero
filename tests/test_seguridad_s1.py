@@ -61,8 +61,8 @@ def test_regla_pura_debe_bloquear():
     assert bloqueado is True
     assert "Demasiados intentos" in motivo
 
-    # 20 fallos de IP -> bloquea
-    recientes_ip_20 = [ahora - timedelta(minutes=i) for i in range(20)]
+    # 20 fallos de IP dentro de la ventana de 10 min -> bloquea
+    recientes_ip_20 = [ahora - timedelta(seconds=i*25) for i in range(20)]
     bloqueado, motivo = debe_bloquear(recientes_correo, recientes_ip_20, ahora)
     assert bloqueado is True
     assert "Demasiados intentos" in motivo

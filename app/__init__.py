@@ -19,6 +19,11 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Configurar ProxyFix solo en producción para leer IP real del cliente tras proxy/Render (H-2)
+    if app.config.get("PRODUCCION"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     # Inicializar base de datos
     app.teardown_appcontext(cerrar_db)
 

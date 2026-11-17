@@ -28,8 +28,9 @@ def cliente(app):
 def usuario_prueba(app):
     """Crea usuarios de prueba para admin y empleado."""
     with app.app_context():
-        # Limpiar usuarios de prueba si existían
+        # Limpiar usuarios de prueba e intentos si existían
         ejecutar("DELETE FROM personal WHERE correo IN ('admin_test@quero.pe', 'empleado_test@quero.pe')")
+        ejecutar("DELETE FROM intento_login WHERE correo_lower IN ('admin_test@quero.pe', 'empleado_test@quero.pe')")
 
         hash_clave = generate_password_hash("clave123")
         ejecutar(
@@ -47,3 +48,4 @@ def usuario_prueba(app):
 
     with app.app_context():
         ejecutar("DELETE FROM personal WHERE correo IN ('admin_test@quero.pe', 'empleado_test@quero.pe')")
+        ejecutar("DELETE FROM intento_login WHERE correo_lower IN ('admin_test@quero.pe', 'empleado_test@quero.pe')")
