@@ -32,9 +32,21 @@ CREATE TABLE personal (
   rol                 VARCHAR(10)  NOT NULL CHECK (rol IN ('admin','empleado')),
   activo              BOOLEAN      NOT NULL DEFAULT TRUE,
   debe_cambiar_clave  BOOLEAN      NOT NULL DEFAULT TRUE,
+  sesion_version      INT          NOT NULL DEFAULT 1,
   creado_en           TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX ux_personal_correo ON personal (lower(correo));
+
+-- Registro de intentos de login para mitigar ataques de fuerza bruta (H-2)
+CREATE TABLE intento_login (
+  intento_id    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  correo_lower  VARCHAR(255) NOT NULL,
+  ip            VARCHAR(45)  NOT NULL,
+  exitoso       BOOLEAN      NOT NULL DEFAULT FALSE,
+  creado_en     TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_intento_login_correo_tiempo ON intento_login (correo_lower, creado_en);
+CREATE INDEX idx_intento_login_ip_tiempo ON intento_login (ip, creado_en);
 
 -- ---------- Configuración del local (una sola fila) ----------
 -- Todo lo que la dueña ajusta vive aquí, no en el código.
