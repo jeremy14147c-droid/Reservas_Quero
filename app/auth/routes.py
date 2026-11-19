@@ -1,10 +1,10 @@
-"""Rutas para autenticación del personal: login, logout y cambio de contraseña (Fase S1)."""
+"""Rutas para autenticación del personal: login, logout y cambio de contraseña (Fase S1 / 3.R)."""
 from datetime import datetime, timedelta, timezone
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, current_app
 from flask_login import login_user, logout_user, login_required
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.db import consultar_uno, consultar_todos, ejecutar
+from app.dao.personal_dao import PersonalDAO
 from app.auth.usuario import UsuarioStaff, obtener_usuario_actual
 from app.auth.seguridad import (
     destino_seguro,
@@ -15,6 +15,7 @@ from app.auth.seguridad import (
 from app.config import Config
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+personal_dao_default = PersonalDAO()
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -39,15 +40,8 @@ def login():
         ventana_min = current_app.config.get("LOGIN_VENTANA_MIN", Config.LOGIN_VENTANA_MIN)
         limite_tiempo = ahora - timedelta(minutes=ventana_min)
 
-        # H-2: Consultar intentos fallidos recientes para correo e IP
-        filas_intentos = consultar_todos(
-            """
-            SELECT creado_en, correo_lower, ip
-            FROM intento_login
-            WHERE exitoso = FALSE AND creado_en >= %s AND (correo_lower = %s OR ip = %s)
-            """,
-            (limite_tiempo, correo, ip)
-        )
+        # H-2: Consultar intentos fallidos recientes para correo e IP a través del DAO
+        filas_intentos = personal_dao_default.consultar_intentos_fallidos(limite_tiempo, correo, ip)
         recientes_correo = [f["creado_en"] for f in filas_intentos if f["correo_lower"] == correo]
         recientes_ip = [f["creado_en"] for f in filas_intentos if f["ip"] == ip]
 
@@ -64,14 +58,8 @@ def login():
             flash(motivo, "danger")
             return render_template("auth/login.html")
 
-        # Buscar usuario en la base de datos
-        fila = consultar_uno(
-            """
-            SELECT personal_id, nombre, correo, password_hash, rol, activo, debe_cambiar_clave, sesion_version
-            FROM personal WHERE lower(correo) = %s
-            """,
-            (correo,)
-        )
+        # Buscar usuario en la base de datos a través del DAO
+        fila = personal_dao_default.buscar_por_correo(correo)
 
         # H-4: Mitigar ataque de tiempo: si usuario no existe o está inactivo, calcular hash igualmente
         if not fila or not fila["activo"]:
@@ -82,19 +70,13 @@ def login():
 
         if not credenciales_validas:
             # Registrar intento fallido
-            ejecutar(
-                "INSERT INTO intento_login (correo_lower, ip, exitoso, creado_en) VALUES (%s, %s, FALSE, %s)",
-                (correo, ip, ahora)
-            )
+            personal_dao_default.registrar_intento(correo, ip, False, ahora)
             flash("Credenciales incorrectas o cuenta inactiva.", "danger")
             return render_template("auth/login.html")
 
         # Credenciales correctas: limpiar intentos fallidos de ese correo
-        ejecutar("DELETE FROM intento_login WHERE correo_lower = %s", (correo,))
-        ejecutar(
-            "INSERT INTO intento_login (correo_lower, ip, exitoso, creado_en) VALUES (%s, %s, TRUE, %s)",
-            (correo, ip, ahora)
-        )
+        personal_dao_default.limpiar_intentos(correo)
+        personal_dao_default.registrar_intento(correo, ip, True, ahora)
 
         # Iniciar sesión y guardar sesion_version (H-1)
         usuario_staff = UsuarioStaff(fila)
@@ -123,10 +105,7 @@ def logout():
     usuario = obtener_usuario_actual()
     if usuario:
         # Incrementar sesion_version en BD para invalidar cookies clonadas
-        ejecutar(
-            "UPDATE personal SET sesion_version = sesion_version + 1 WHERE personal_id = %s",
-            (usuario.id,)
-        )
+        personal_dao_default.incrementar_sesion_version(usuario.id)
     logout_user()
     session.clear()
     flash("Has cerrado sesión correctamente.", "info")
@@ -158,27 +137,20 @@ def cambiar_clave():
             flash("Las contraseñas nuevas no coinciden.", "danger")
             return render_template("auth/cambiar_clave.html")
 
-        # Verificar clave actual en base de datos
-        fila = consultar_uno(
-            "SELECT password_hash, sesion_version FROM personal WHERE personal_id = %s",
-            (usuario.id,)
-        )
+        # Verificar clave actual en base de datos mediante DAO
+        fila = personal_dao_default.buscar_por_id(usuario.id)
+        # Para verificar contraseña necesitamos la fila con password_hash
+        fila_completa = personal_dao_default.buscar_por_correo(usuario.correo)
 
-        if not fila or not check_password_hash(fila["password_hash"], clave_actual):
+        if not fila_completa or not check_password_hash(fila_completa["password_hash"], clave_actual):
             flash("La contraseña actual no es correcta.", "danger")
             return render_template("auth/cambiar_clave.html")
 
         # Actualizar contraseña, quitar debe_cambiar_clave e incrementar sesion_version (H-1)
         nuevo_hash = generate_password_hash(nueva_clave)
-        nueva_version = fila.get("sesion_version", 1) + 1
-        ejecutar(
-            """
-            UPDATE personal
-            SET password_hash = %s, debe_cambiar_clave = FALSE, sesion_version = %s
-            WHERE personal_id = %s
-            """,
-            (nuevo_hash, nueva_version, usuario.id)
-        )
+        nueva_version = fila_completa.get("sesion_version", 1) + 1
+        personal_dao_default.actualizar_password(usuario.id, nuevo_hash, debe_cambiar_clave=False, nueva_version=nueva_version)
+
         usuario.debe_cambiar_clave = False
         usuario.sesion_version = nueva_version
         session["sesion_version"] = nueva_version

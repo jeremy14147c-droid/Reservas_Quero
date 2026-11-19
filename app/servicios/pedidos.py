@@ -10,13 +10,21 @@ Reglas de AGENTS.md sección 8:
 - precio_venta se copia del precio del plato; no se puede pedir un plato no disponible/inactivo.
 - Los pedidos NO se limitan por aforo ni mesas.
 
-Excepciones: ValueError con mensaje claro para el usuario (las rutas lo traducen a JSON/flash).
+Excepciones: ValueError con mensaje claro para el usuario.
 """
 from datetime import datetime, timedelta
 
-from app.db import consultar_todos, consultar_uno, ejecutar, ejecutar_retornando
+from app.dao.pedido_dao import PedidoDAO
+from app.dao.carta_dao import CartaDAO
+from app.dao.cliente_dao import ClienteDAO
+from app.dao.config_dao import ConfigDAO
 from app.utils import normalizar_telefono
 from app.servicios import clientes as servicio_clientes
+
+pedido_dao_default = PedidoDAO()
+carta_dao_default = CartaDAO()
+cliente_dao_default = ClienteDAO()
+config_dao_default = ConfigDAO()
 
 # Única fuente de verdad de los estados
 TRANSICIONES_VALIDAS = {
@@ -27,26 +35,22 @@ TRANSICIONES_VALIDAS = {
 }
 
 MEDIOS_PAGO = ("efectivo", "yape", "plin", "transferencia", "otro")
-
-MAX_CANTIDAD = 99   # tope por línea: nadie pide 100 de lo mismo en un MVP
+MAX_CANTIDAD = 99
 
 
 # ---------------------------------------------------------------- configuración
 
-def obtener_config():
-    """Config del local (fila única). Reutiliza el servicio de reservas."""
-    from app.servicios.reservas import obtener_config as config_reservas
-    return config_reservas()
+def obtener_config(config_dao=None):
+    """Config del local (fila única)."""
+    config_dao = config_dao or config_dao_default
+    return config_dao.obtener()
 
 
 # ---------------------------------------------------------------- validaciones
 
-def _validar_items(items):
-    """Valida la lista de líneas del pedido. Devuelve [{plato_id, cantidad, nota, precio_venta,...}]
-    con el precio copiado del plato (precio_venta NO es editable por el cliente).
-    - Cada plato debe existir, estar activo y disponible.
-    - Cantidad entre 1 y MAX_CANTIDAD; nota de línea hasta 200 caracteres.
-    """
+def _validar_items(items, carta_dao=None):
+    """Valida la lista de líneas del pedido con el precio copiado del plato."""
+    carta_dao = carta_dao or carta_dao_default
     if not items or not isinstance(items, list):
         raise ValueError("Agrega al menos un plato al pedido.")
 
@@ -63,10 +67,7 @@ def _validar_items(items):
         if cantidad < 1 or cantidad > MAX_CANTIDAD:
             raise ValueError(f"La cantidad por plato va de 1 a {MAX_CANTIDAD}.")
 
-        plato = consultar_uno(
-            "SELECT plato_id, nombre, precio, disponible, activo FROM plato WHERE plato_id = %s",
-            (plato_id,)
-        )
+        plato = carta_dao.buscar_plato_por_id(plato_id)
         if not plato or not plato["activo"]:
             raise ValueError("Uno de los platos ya no existe en la carta. Actualiza la página.")
         if not plato["disponible"]:
@@ -81,10 +82,9 @@ def _validar_items(items):
             "nombre": plato["nombre"],
             "cantidad": cantidad,
             "nota": nota,
-            "precio_venta": float(plato["precio"]),   # se copia del plato, nunca se edita
+            "precio_venta": float(plato["precio"]),
         })
 
-    # Si el mismo plato aparece varias veces, se suman las cantidades
     combinadas = {}
     for linea in lineas:
         base = combinadas.get(linea["plato_id"])
@@ -97,24 +97,14 @@ def _validar_items(items):
     return list(combinadas.values())
 
 
-def _insertar_lineas(pedido_id, lineas):
-    """Guarda las líneas del pedido (detalle_pedido) con el precio copiado."""
-    for linea in lineas:
-        ejecutar(
-            "INSERT INTO detalle_pedido (pedido_id, plato_id, cantidad, precio_venta, nota) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            (pedido_id, linea["plato_id"], linea["cantidad"], linea["precio_venta"], linea["nota"])
-        )
-
-
 # ---------------------------------------------------------------- creación
 
-def crear_pedido_recojo_web(datos):
-    """Pedido de recojo pedido por la web: nace 'pendiente' (el staff decide si lo acepta).
-    Exige cliente (nombre + teléfono 9... + consentimiento). Solo platos disponibles.
-    No hay tope por actividad para pedidos: si el cliente repite, es solo un AVISO al staff
-    (la insignia 'ya pidió hace menos de 24 h' se calcula en la cola).
-    """
+def crear_pedido_recojo_web(datos, dao=None, cliente_dao=None, carta_dao=None):
+    """Pedido de recojo pedido por la web: nace 'pendiente'."""
+    dao = dao or pedido_dao_default
+    cliente_dao = cliente_dao or cliente_dao_default
+    carta_dao = carta_dao or carta_dao_default
+
     nombre = (datos.get("nombre") or "").strip()
     if not nombre:
         raise ValueError("Tu nombre es obligatorio.")
@@ -136,34 +126,29 @@ def crear_pedido_recojo_web(datos):
     if nota and len(nota) > 300:
         raise ValueError("La nota es demasiado larga (máximo 300 caracteres).")
 
-    lineas = _validar_items(datos.get("items"))
+    lineas = _validar_items(datos.get("items"), carta_dao=carta_dao)
+    cliente = servicio_clientes.obtener_o_crear_cliente(nombre, telefono, correo, dao=cliente_dao)
 
-    # La llave del cliente es el teléfono: se reutiliza la ficha sin sobrescribir nada
-    cliente = servicio_clientes.obtener_o_crear_cliente(nombre, telefono, correo)
-
-    fila_pedido = ejecutar_retornando(
-        "INSERT INTO pedido (cliente_id, tipo, canal, estado, nota) "
-        "VALUES (%s, 'recojo', 'web', 'pendiente', %s) "
-        "RETURNING pedido_id, token, tipo, canal, estado",
-        (cliente["cliente_id"], nota)
-    )
-    _insertar_lineas(fila_pedido["pedido_id"], lineas)
+    fila_pedido = dao.insertar_recojo(cliente["cliente_id"], nota)
+    dao.insertar_lineas(fila_pedido["pedido_id"], lineas)
     return fila_pedido
 
 
-def crear_pedido_local_staff(datos, personal_id):
-    """Pedido en local creado por el staff: nace 'en_preparacion' (entra luego a cocina de una vez).
-    Cliente opcional (take-away de alguien conocido o cliente de mesa anónimo).
-    'mesa_referencia' es texto libre (mezcla, mesa 3, barra...).
-    """
+def crear_pedido_local_staff(datos, personal_id, dao=None, cliente_dao=None, carta_dao=None):
+    """Pedido en local creado por el staff: nace 'en_preparacion'."""
+    dao = dao or pedido_dao_default
+    cliente_dao = cliente_dao or cliente_dao_default
+    carta_dao = carta_dao or carta_dao_default
+
     cliente_id = None
     telefono = normalizar_telefono(datos.get("telefono"))
     nombre = (datos.get("nombre") or "").strip()
     if telefono or nombre:
         if not telefono:
             raise ValueError("Si registras un cliente, su teléfono de 9 dígitos (que empiece en 9) es obligatorio.")
-        cliente = servicio_clientes.obtener_o_crear_cliente(nombre or "Cliente del local", telefono,
-                                                            datos.get("correo") or None)
+        cliente = servicio_clientes.obtener_o_crear_cliente(
+            nombre or "Cliente del local", telefono, datos.get("correo") or None, dao=cliente_dao
+        )
         cliente_id = cliente["cliente_id"]
 
     mesa = (datos.get("mesa_referencia") or "").strip() or None
@@ -174,27 +159,18 @@ def crear_pedido_local_staff(datos, personal_id):
     if nota and len(nota) > 300:
         raise ValueError("La nota es demasiado larga (máximo 300 caracteres).")
 
-    lineas = _validar_items(datos.get("items"))
-
-    fila_pedido = ejecutar_retornando(
-        "INSERT INTO pedido (cliente_id, tipo, canal, estado, mesa_referencia, nota, creado_por, "
-        "preparacion_en) "
-        "VALUES (%s, 'local', 'staff', 'en_preparacion', %s, %s, %s, now()) "
-        "RETURNING pedido_id, token, tipo, canal, estado",
-        (cliente_id, mesa, nota, personal_id)
-    )
-    _insertar_lineas(fila_pedido["pedido_id"], lineas)
+    lineas = _validar_items(datos.get("items"), carta_dao=carta_dao)
+    fila_pedido = dao.insertar_local(cliente_id, mesa, nota, personal_id)
+    dao.insertar_lineas(fila_pedido["pedido_id"], lineas)
     return fila_pedido
 
 
 # ---------------------------------------------------------------- transiciones
 
-def transicion_pedido(pedido_id, nuevo_estado, motivo_rechazo=None):
-    """ÚNICA función que cambia el estado de un pedido. Rechaza las transiciones inválidas
-    y llena aceptado_en, preparacion_en, listo_en y entregado_en según el destino.
-    Un recojo 'aceptado' SOLO pasa a cocina si ya está cobrado.
-    """
-    resumen = obtener_resumen(pedido_id)
+def transicion_pedido(pedido_id, nuevo_estado, motivo_rechazo=None, dao=None):
+    """ÚNICA función que cambia el estado de un pedido."""
+    dao = dao or pedido_dao_default
+    resumen = dao.obtener_resumen(pedido_id)
     if not resumen:
         raise ValueError("El pedido no existe.")
 
@@ -213,9 +189,9 @@ def transicion_pedido(pedido_id, nuevo_estado, motivo_rechazo=None):
         raise ValueError("El motivo es demasiado largo (máximo 200 caracteres).")
 
     # Regla especial: de aceptado a cocina solo si el dinero ya entró
-    if estado_actual == "aceptado" and nuevo_estado == "en_preparacion" and not resumen["cobrado"]:
+    if estado_actual == "aceptado" and nuevo_estado == "en_preparacion" and not resumen.get("cobrado"):
         raise ValueError(
-            "El pedido pasa a cocina solo cuando queda cobrado. Registra el pago (monta real "
+            "El pedido pasa a cocina solo cuando queda cobrado. Registra el pago (monto real "
             "visto en Yape/Plin o efectivo) primero."
         )
 
@@ -228,45 +204,60 @@ def transicion_pedido(pedido_id, nuevo_estado, motivo_rechazo=None):
     sql_marca = marcas.get(nuevo_estado, "")
     asignado = f"{sql_marca}, " if sql_marca else ""
 
-    fila = ejecutar_retornando(
-        f"""UPDATE pedido
-            SET estado = %s, {asignado}motivo_rechazo = COALESCE(%s, motivo_rechazo)
-            WHERE pedido_id = %s
-            RETURNING pedido_id, token, tipo, canal, estado""",
-        (nuevo_estado, motivo, pedido_id)
-    )
-    return fila
+    return dao.actualizar_estado(pedido_id, nuevo_estado, asignado_tiempo_sql=asignado, motivo_rechazo=motivo)
+
+
+def aceptar_pedido(pedido_id, dao=None):
+    return transicion_pedido(pedido_id, "aceptado", dao=dao)
+
+
+def rechazar_pedido(pedido_id, motivo, dao=None):
+    return transicion_pedido(pedido_id, "rechazado", motivo_rechazo=motivo, dao=dao)
+
+
+def cancelar_pedido(pedido_id, motivo=None, dao=None):
+    return transicion_pedido(pedido_id, "cancelado", motivo_rechazo=motivo, dao=dao)
+
+
+def pasar_a_preparacion(pedido_id, dao=None):
+    return transicion_pedido(pedido_id, "en_preparacion", dao=dao)
+
+
+def marcar_listo(pedido_id, dao=None):
+    return transicion_pedido(pedido_id, "listo", dao=dao)
+
+
+def marcar_entregado(pedido_id, dao=None):
+    return transicion_pedido(pedido_id, "entregado", dao=dao)
 
 
 # ---------------------------------------------------------------- edición de líneas
 
-def actualizar_lineas(pedido_id, items):
-    """Ajusta (agrega, quita o cambia cantidades de) las líneas de un pedido RECOJO pendiente.
-    Al aceptar el pedido el monto queda fijo y esto ya no se puede usar.
-    """
-    pedido = consultar_uno("SELECT pedido_id, estado FROM pedido WHERE pedido_id = %s", (pedido_id,))
+def actualizar_lineas(pedido_id, items, dao=None, carta_dao=None):
+    """Ajusta las líneas de un pedido RECOJO pendiente."""
+    dao = dao or pedido_dao_default
+    carta_dao = carta_dao or carta_dao_default
+
+    pedido = dao.buscar_por_id(pedido_id)
     if not pedido:
         raise ValueError("El pedido no existe.")
     if pedido["estado"] != "pendiente":
         raise ValueError("Solo se puede editar el detalle mientras el pedido está pendiente. "
                          "Al aceptarlo el monto queda fijo.")
 
-    lineas = _validar_items(items)
-    ejecutar("DELETE FROM detalle_pedido WHERE pedido_id = %s", (pedido_id,))
-    _insertar_lineas(pedido_id, lineas)
-    return obtener_pedido_detalle(pedido_id)
+    lineas = _validar_items(items, carta_dao=carta_dao)
+    dao.limpiar_lineas(pedido_id)
+    dao.insertar_lineas(pedido_id, lineas)
+    return obtener_pedido_detalle(pedido_id, dao=dao)
 
 
 # ---------------------------------------------------------------- pagos
 
-def registrar_pago(pedido_id, medio, monto, referencia=None, personal_id=None):
-    """Registra un pago REAL confirmado por el staff (mirando el Yape/Plin o cobrando efectivo).
-    - Nunca se paga de más: monto + lo ya pagado no puede superar el total.
-    - Solo en estados donde el cobro tiene sentido (nunca en pendientes de revisión ni finales).
-    - Si con este pago el pedido queda cobrado y estaba 'aceptado', pasa SOLO a 'en_preparacion'.
-    """
+def registrar_pago(pedido_id, medio, monto, referencia=None, personal_id=None, dao=None):
+    """Registra un pago REAL confirmado por el staff."""
+    dao = dao or pedido_dao_default
     monto_val = _a_monto(monto)
-    resumen = obtener_resumen(pedido_id)
+    resumen = dao.obtener_resumen(pedido_id)
     if not resumen:
         raise ValueError("El pedido no existe.")
 
@@ -280,7 +271,7 @@ def registrar_pago(pedido_id, medio, monto, referencia=None, personal_id=None):
         raise ValueError("El medio de pago no es válido.")
 
     saldo = float(resumen["total"]) - float(resumen["pagado"])
-    if monto_val > saldo + 0.001:   # tolerancia de centavos por redondeo
+    if monto_val > saldo + 0.001:
         raise ValueError(
             f"No se puede pagar de más. El saldo por cobrar es S/ {saldo:.2f} "
             f"(total S/ {float(resumen['total']):.2f}, ya pagado S/ {float(resumen['pagado']):.2f})."
@@ -290,18 +281,14 @@ def registrar_pago(pedido_id, medio, monto, referencia=None, personal_id=None):
     if referencia_txt and len(referencia_txt) > 60:
         raise ValueError("La referencia de pago es demasiado larga (máximo 60 caracteres).")
 
-    ejecutar(
-        "INSERT INTO pago (pedido_id, monto, medio, referencia, confirmado_por) "
-        "VALUES (%s, %s, %s, %s, %s)",
-        (pedido_id, monto_val, medio, referencia_txt, personal_id)
-    )
+    dao.registrar_pago(pedido_id, monto_val, medio, referencia_txt, personal_id)
 
     # Dinero ya completo y seguía esperando el cobro: entra directo a cocina
     if float(resumen["pagado"]) + monto_val >= float(resumen["total"]) - 0.001 \
             and resumen["estado"] == "aceptado":
-        transicion_pedido(pedido_id, "en_preparacion")
+        transicion_pedido(pedido_id, "en_preparacion", dao=dao)
 
-    return obtener_resumen(pedido_id)
+    return dao.obtener_resumen(pedido_id)
 
 
 def _a_monto(valor):
@@ -317,54 +304,26 @@ def _a_monto(valor):
 
 # ---------------------------------------------------------------- consultas
 
-def obtener_resumen(pedido_id):
-    """Fila de v_pedido_resumen (total, pagado, cobrado) + datos del pedido (lo calculado NO se guarda)."""
-    return consultar_uno(
-        """SELECT p.pedido_id, p.token, p.tipo, p.canal, p.estado, p.mesa_referencia,
-                  p.nota, p.motivo_rechazo, p.creado_por,
-                  p.creado_en, p.aceptado_en, p.preparacion_en, p.listo_en, p.entregado_en,
-                  r.total, r.pagado, r.cobrado
-           FROM pedido p JOIN v_pedido_resumen r ON r.pedido_id = p.pedido_id
-           WHERE p.pedido_id = %s""",
-        (pedido_id,)
-    )
+def obtener_resumen(pedido_id, dao=None):
+    """Fila de v_pedido_resumen (total, pagado, cobrado) + datos del pedido."""
+    dao = dao or pedido_dao_default
+    return dao.obtener_resumen(pedido_id)
 
 
-def obtener_pedido_detalle(pedido_id):
-    """Detalle completo para el panel del staff: pedido + líneas + cliente (sin datos de más)."""
-    detalle = consultar_uno(
-        """SELECT p.pedido_id, p.token, p.tipo, p.canal, p.estado, p.mesa_referencia,
-                  p.nota, p.motivo_rechazo, p.creado_en, p.aceptado_en, p.preparacion_en,
-                  p.listo_en, p.entregado_en,
-                  r.total, r.pagado, r.cobrado,
-                  c.cliente_id, c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
-                  c.correo AS cliente_correo
-           FROM pedido p
-           JOIN v_pedido_resumen r ON r.pedido_id = p.pedido_id
-           LEFT JOIN cliente c ON c.cliente_id = p.cliente_id
-           WHERE p.pedido_id = %s""",
-        (pedido_id,)
-    )
+def obtener_pedido_detalle(pedido_id, dao=None, cliente_dao=None):
+    """Detalle completo para el panel del staff: pedido + líneas + cliente."""
+    dao = dao or pedido_dao_default
+    cliente_dao = cliente_dao or cliente_dao_default
+
+    detalle = dao.obtener_pedido_detalle(pedido_id)
     if not detalle:
         return None
 
-    detalle["lineas"] = consultar_todos(
-        """SELECT d.detalle_id, d.plato_id, d.cantidad, d.precio_venta, d.nota,
-                  pl.nombre AS plato_nombre, pl.codigo AS plato_codigo, pl.disponible
-           FROM detalle_pedido d
-           JOIN plato pl ON pl.plato_id = d.plato_id
-           WHERE d.pedido_id = %s
-           ORDER BY d.detalle_id""",
-        (pedido_id,)
-    )
-    detalle["pagos"] = consultar_todos(
-        """SELECT monto, medio, referencia, confirmado_en
-           FROM pago WHERE pedido_id = %s ORDER BY pago_id""",
-        (pedido_id,)
-    )
-    # Insignia de actividad reciente (solo aviso al staff)
-    if detalle["cliente_id"]:
-        actividad = servicio_clientes.actividad_24h(detalle["cliente_id"])
+    detalle["lineas"] = dao.obtener_lineas_detalle(pedido_id)
+    detalle["pagos"] = dao.obtener_pagos(pedido_id)
+
+    if detalle.get("cliente_id"):
+        actividad = servicio_clientes.actividad_24h(detalle["cliente_id"], dao=cliente_dao)
         detalle["actividad_24h"] = bool(
             actividad and (actividad["pedidos_24h"] + actividad["reservas_24h"]) > 0
         )
@@ -373,27 +332,10 @@ def obtener_pedido_detalle(pedido_id):
     return detalle
 
 
-def obtener_cola():
-    """Datos de la cola del staff (4 columnas): pendientes, por cobrar, en cocina, listos.
-    También incluye entregados del día para que el staff los vea unos momentos.
-    """
-    filas = consultar_todos(
-        """SELECT p.pedido_id, p.token, p.tipo, p.canal, p.estado, p.mesa_referencia, p.nota,
-                  p.creado_en, p.preparacion_en,
-                  r.total, r.pagado, r.cobrado,
-                  c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
-                  c.correo AS cliente_correo, c.cliente_id,
-                  (CASE WHEN p.cliente_id IS NOT NULL THEN (
-                        SELECT coalesce(a.pedidos_24h + a.reservas_24h, 0)
-                        FROM v_cliente_actividad_24h a WHERE a.cliente_id = p.cliente_id
-                    ) ELSE 0 END) > 0 AS actividad_24h
-           FROM pedido p
-           JOIN v_pedido_resumen r ON r.pedido_id = p.pedido_id
-           LEFT JOIN cliente c ON c.cliente_id = p.cliente_id
-           WHERE (p.estado IN ('pendiente','aceptado','en_preparacion','listo'))
-              OR (p.estado = 'entregado' AND p.creado_en::date = CURRENT_DATE)
-           ORDER BY p.creado_en, p.pedido_id"""
-    )
+def obtener_cola(dao=None):
+    """Datos de la cola del staff (4 columnas): pendientes, por cobrar, en cocina, listos."""
+    dao = dao or pedido_dao_default
+    filas = dao.listar_cola()
 
     cola = {"pendientes": [], "por_cobrar": [], "en_cocina": [], "listos": [], "entregados": []}
     for fila in filas:
@@ -409,40 +351,21 @@ def obtener_cola():
             cola["listos"].append(fila)
         elif fila["estado"] == "entregado":
             cola["entregados"].append(fila)
-        # 'aceptado' ya cobrado tarda un instante en pasar a cocina: lo dejamos en por_cobrar
         elif fila["estado"] == "aceptado":
             cola["por_cobrar"].append(fila)
     return cola
 
 
-def obtener_cocina():
-    """Tablero de cocina: pedidos en preparación con minutos transcurridos desde preparacion_en.
-    'atrasado' (rojo, solo visual) cuando supera umbral_preparacion_min de config_local.
-    """
-    config = obtener_config()
-    # la BD guarda TIMESTAMPTZ: se usa la hora local de Lima CON zona para restar bien
+def obtener_cocina(dao=None, config_dao=None):
+    """Tablero de cocina: pedidos en preparación con minutos transcurridos."""
+    dao = dao or pedido_dao_default
+    config_dao = config_dao or config_dao_default
+
+    config = obtener_config(config_dao)
     from app.utils import ahora_local
     ahora = ahora_local()
 
-    filas = consultar_todos(
-        """SELECT p.pedido_id, p.token, p.tipo, p.estado, p.mesa_referencia, p.nota,
-                  p.preparacion_en,
-                  r.total, r.cobrado,
-                  c.nombre AS cliente_nombre,
-                  json_agg(json_build_object(
-                        'nombre', pl.nombre,
-                        'cantidad', d.cantidad,
-                        'nota', d.nota
-                  ) ORDER BY d.detalle_id) AS lineas
-           FROM pedido p
-           JOIN v_pedido_resumen r ON r.pedido_id = p.pedido_id
-           LEFT JOIN cliente c ON c.cliente_id = p.cliente_id
-           LEFT JOIN detalle_pedido d ON d.pedido_id = p.pedido_id
-           LEFT JOIN plato pl ON pl.plato_id = d.plato_id
-           WHERE p.estado = 'en_preparacion'
-           GROUP BY p.pedido_id, r.total, r.cobrado, c.nombre
-           ORDER BY p.preparacion_en, p.pedido_id"""
-    )
+    filas = dao.listar_cocina()
 
     cocina = []
     for fila in filas:
@@ -452,34 +375,23 @@ def obtener_cocina():
         if inicio is not None:
             minutos = int((ahora - inicio).total_seconds() // 60)
         fila["minutos"] = minutos
-        # 'preparacion_en' llega con zona horaria; se compara contra el umbral directo
         fila["atrasado"] = inicio is not None and minutos >= config["umbral_preparacion_min"]
         cocina.append(fila)
     return cocina
 
 
-def obtener_pedido_publico(token):
-    """Datos del pedido para la página del cliente (nunca va nada interno del local)."""
-    pedido = consultar_uno(
-        """SELECT p.pedido_id, p.token, p.tipo, p.estado, p.motivo_rechazo,
-                  p.creado_en, p.aceptado_en, p.preparacion_en, p.listo_en, p.entregado_en,
-                  r.total, r.pagado, r.cobrado
-           FROM pedido p JOIN v_pedido_resumen r ON r.pedido_id = p.pedido_id
-           WHERE p.token = %s""",
-        (token,)
-    )
+def obtener_pedido_publico(token, dao=None, config_dao=None):
+    """Datos del pedido para la página del cliente."""
+    dao = dao or pedido_dao_default
+    config_dao = config_dao or config_dao_default
+
+    pedido = dao.obtener_pedido_publico(token)
     if not pedido:
         return None
 
-    pedido["lineas"] = consultar_todos(
-        """SELECT d.cantidad, d.precio_venta, d.nota, pl.nombre AS plato_nombre
-           FROM detalle_pedido d JOIN plato pl ON pl.plato_id = d.plato_id
-           WHERE d.pedido_id = %s ORDER BY d.detalle_id""",
-        (pedido["pedido_id"],)
-    )
+    pedido["lineas"] = dao.obtener_lineas_publicas(pedido["pedido_id"])
     if pedido["estado"] == "aceptado" and not pedido["cobrado"]:
-        # Instrucciones de pago con los datos Yape de config_local
-        config = obtener_config()
+        config = obtener_config(config_dao)
         pedido["instrucciones_pago"] = {
             "yape_numero": config["yape_numero"],
             "yape_titular": config["yape_titular"],

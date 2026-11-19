@@ -1,7 +1,9 @@
 """Modelo y funciones de usuario para autenticación de Flask-Login."""
 from flask import session
 from flask_login import UserMixin, current_user
-from app.db import consultar_uno
+from app.dao.personal_dao import PersonalDAO
+
+personal_dao_default = PersonalDAO()
 
 
 class UsuarioStaff(UserMixin):
@@ -29,16 +31,13 @@ class UsuarioStaff(UserMixin):
         return self.rol == "empleado"
 
 
-def cargar_usuario(personal_id):
+def cargar_usuario(personal_id, dao=None):
     """Carga el usuario desde la base de datos por su ID para Flask-Login (H-1).
     Valida además que la versión de sesión coincida con la cookie actual.
     """
+    dao = dao or personal_dao_default
     try:
-        fila = consultar_uno(
-            "SELECT personal_id, nombre, correo, rol, activo, debe_cambiar_clave, sesion_version "
-            "FROM personal WHERE personal_id = %s",
-            (int(personal_id),)
-        )
+        fila = dao.buscar_por_id(int(personal_id))
         if fila and fila["activo"]:
             # Validar versión de sesión: si no coincide con la guardada en la cookie, revocar
             sesion_v = session.get("sesion_version")

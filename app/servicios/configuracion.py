@@ -1,17 +1,22 @@
 """Servicio para consultar y actualizar la configuración operativa del local (config_local)."""
 from datetime import time
-from app.db import consultar_uno, ejecutar
+from app.dao.config_dao import ConfigDAO
+
+# Instancia por defecto del DAO
+config_dao_default = ConfigDAO()
 
 
-def obtener_config_local():
+def obtener_config_local(dao=None):
     """Devuelve la fila de configuración del local (config_id = 1)."""
-    return consultar_uno("SELECT * FROM config_local WHERE config_id = 1")
+    dao = dao or config_dao_default
+    return dao.obtener()
 
 
-def actualizar_config_local(datos):
+def actualizar_config_local(datos, dao=None):
     """Valida y actualiza los parámetros operativos del local en config_local.
     Lanza ValueError con mensaje claro si alguna validación falla.
     """
+    dao = dao or config_dao_default
     nombre_local = (datos.get("nombre_local") or "").strip()
     if not nombre_local:
         raise ValueError("El nombre del local es obligatorio.")
@@ -59,115 +64,96 @@ def actualizar_config_local(datos):
         if franja not in (15, 30, 60):
             raise ValueError("La franja horaria debe ser de 15, 30 o 60 minutos.")
     except (TypeError, ValueError):
-        raise ValueError("La franja horaria debe ser 15, 30 o 60 minutos.")
+        raise ValueError("La franja horaria debe ser un número válido.")
 
     try:
         tolerancia = int(datos.get("tolerancia_min", 0))
         if tolerancia < 0:
-            raise ValueError("La tolerancia no puede ser negativa.")
+            raise ValueError("La tolerancia debe ser mayor o igual a 0 minutos.")
     except (TypeError, ValueError):
-        raise ValueError("La tolerancia debe ser un número entero igual o mayor a 0.")
+        raise ValueError("La tolerancia debe ser un número entero.")
 
     try:
         umbral_prep = int(datos.get("umbral_preparacion_min", 0))
         if umbral_prep <= 0:
-            raise ValueError("El umbral de preparación de cocina debe ser mayor a 0 minutos.")
+            raise ValueError("El tiempo de preparación en cocina debe ser mayor a 0 minutos.")
     except (TypeError, ValueError):
-        raise ValueError("El umbral de preparación de cocina debe ser un número entero positivo.")
+        raise ValueError("El tiempo de preparación en cocina debe ser un número entero positivo.")
 
     try:
         max_web_tel = int(datos.get("max_reservas_web_por_telefono", 2))
         if max_web_tel < 1:
-            raise ValueError("El máximo de reservas web por teléfono debe ser al menos 1.")
+            raise ValueError("El tope de reservas web por teléfono debe ser al menos 1.")
     except (TypeError, ValueError):
-        raise ValueError("El máximo de reservas web por teléfono debe ser un número entero mayor o igual a 1.")
+        raise ValueError("El tope de reservas web por teléfono debe ser un número entero.")
 
     try:
         umbral_alerta = int(datos.get("umbral_alerta_pct", 80))
         if not (1 <= umbral_alerta <= 100):
-            raise ValueError("El umbral de alerta de ocupación debe estar entre 1% y 100%.")
+            raise ValueError("El umbral de alerta debe estar entre 1% y 100%.")
     except (TypeError, ValueError):
-        raise ValueError("El umbral de alerta de ocupación debe ser un número entre 1 y 100.")
+        raise ValueError("El umbral de alerta de ocupación debe ser un número entero entre 1 y 100.")
 
-    # Horarios de apertura y cierre
-    hora_apertura = datos.get("hora_apertura")
-    hora_cierre = datos.get("hora_cierre")
-    if not hora_apertura or not hora_cierre:
-        raise ValueError("Los horarios de apertura y cierre son obligatorios.")
+    def _parsear_hora(valor_str, nombre_campo):
+        if not valor_str:
+            raise ValueError(f"El campo {nombre_campo} es obligatorio.")
+        try:
+            partes = str(valor_str).strip().split(":")
+            h, m = int(partes[0]), int(partes[1])
+            return time(h, m)
+        except Exception:
+            raise ValueError(f"Formato de hora inválido en {nombre_campo} (use HH:MM).")
 
-    if str(hora_cierre) <= str(hora_apertura):
+    hora_apertura = _parsear_hora(datos.get("hora_apertura"), "hora de apertura")
+    hora_cierre = _parsear_hora(datos.get("hora_cierre"), "hora de cierre")
+
+    if hora_apertura >= hora_cierre:
         raise ValueError("La hora de cierre debe ser posterior a la hora de apertura.")
 
     try:
         dias_max = int(datos.get("dias_max_anticipacion", 0))
         if dias_max < 0:
-            raise ValueError("Los días de anticipación no pueden ser negativos.")
+            raise ValueError("Los días de anticipación deben ser mayores o iguales a 0.")
     except (TypeError, ValueError):
-        raise ValueError("Los días de anticipación deben ser un número entero igual o mayor a 0.")
+        raise ValueError("Los días de anticipación deben ser un número entero positivo.")
 
     porc_reservable = datos.get("porcentaje_reservable")
-    if porc_reservable in (None, "", "null", "None"):
-        porc_reservable_val = None
-    else:
+    porc_reservable_val = None
+    if porc_reservable not in (None, ""):
         try:
             porc_reservable_val = int(porc_reservable)
             if not (1 <= porc_reservable_val <= 100):
-                raise ValueError("El porcentaje reservable debe estar entre 1% y 100%.")
+                raise ValueError("El porcentaje reservable debe estar entre 1 y 100.")
         except (TypeError, ValueError):
-            raise ValueError("El porcentaje reservable debe ser un número entre 1 y 100 o dejarse vacío.")
+            raise ValueError("El porcentaje reservable debe ser un número entre 1 y 100, o vacío.")
 
     abierto = bool(datos.get("abierto", True))
     yape_numero = (datos.get("yape_numero") or "").strip() or None
     yape_titular = (datos.get("yape_titular") or "").strip() or None
     mensaje_pago = (datos.get("mensaje_pago") or "").strip() or None
 
-    ejecutar(
-        """
-        UPDATE config_local
-        SET nombre_local = %s,
-            aforo_personas = %s,
-            total_mesas = %s,
-            personas_por_mesa = %s,
-            duracion_1_3_min = %s,
-            duracion_4_7_min = %s,
-            duracion_8_mas_min = %s,
-            franja_min = %s,
-            tolerancia_min = %s,
-            umbral_preparacion_min = %s,
-            max_reservas_web_por_telefono = %s,
-            umbral_alerta_pct = %s,
-            hora_apertura = %s,
-            hora_cierre = %s,
-            dias_max_anticipacion = %s,
-            porcentaje_reservable = %s,
-            abierto = %s,
-            yape_numero = %s,
-            yape_titular = %s,
-            mensaje_pago = %s
-        WHERE config_id = 1
-        """,
-        (
-            nombre_local,
-            aforo,
-            total_mesas,
-            personas_por_mesa,
-            duraciones["duracion_1_3_min"],
-            duraciones["duracion_4_7_min"],
-            duraciones["duracion_8_mas_min"],
-            franja,
-            tolerancia,
-            umbral_prep,
-            max_web_tel,
-            umbral_alerta,
-            hora_apertura,
-            hora_cierre,
-            dias_max,
-            porc_reservable_val,
-            abierto,
-            yape_numero,
-            yape_titular,
-            mensaje_pago
-        )
+    params = (
+        nombre_local,
+        aforo,
+        total_mesas,
+        personas_por_mesa,
+        duraciones["duracion_1_3_min"],
+        duraciones["duracion_4_7_min"],
+        duraciones["duracion_8_mas_min"],
+        franja,
+        tolerancia,
+        umbral_prep,
+        max_web_tel,
+        umbral_alerta,
+        hora_apertura,
+        hora_cierre,
+        dias_max,
+        porc_reservable_val,
+        abierto,
+        yape_numero,
+        yape_titular,
+        mensaje_pago
     )
 
-    return obtener_config_local()
+    dao.actualizar(params)
+    return dao.obtener()

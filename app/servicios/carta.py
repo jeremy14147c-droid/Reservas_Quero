@@ -2,7 +2,10 @@
 Independiente de Flask: recibe datos y retorna resultados o lanza excepciones de negocio.
 """
 import unicodedata
-from app.db import consultar_todos, consultar_uno, ejecutar, ejecutar_retornando
+from app.dao.carta_dao import CartaDAO
+
+# Instancia por defecto del DAO
+carta_dao_default = CartaDAO()
 
 
 def _normalizar_texto(texto):
@@ -14,21 +17,15 @@ def _normalizar_texto(texto):
     return sin_tildes.lower().strip()
 
 
-def obtener_carta_publica():
+def obtener_carta_publica(dao=None):
     """Devuelve las categorías activas con sus platos activos ordenados.
     Los platos con disponible = False vienen marcados para mostrarse como 'Agotado'.
     Los platos con activo = False se omiten por completo.
     Incluye el código del plato cuando exista.
     """
-    categorias = consultar_todos(
-        "SELECT categoria_id, nombre, orden "
-        "FROM categoria WHERE activa = TRUE ORDER BY orden, nombre"
-    )
-
-    platos = consultar_todos(
-        "SELECT plato_id, categoria_id, codigo, nombre, descripcion, precio, disponible "
-        "FROM plato WHERE activo = TRUE ORDER BY codigo NULLS LAST, nombre"
-    )
+    dao = dao or carta_dao_default
+    categorias = dao.listar_categorias_activas()
+    platos = dao.listar_platos_activos()
 
     platos_por_cat = {}
     for p in platos:
@@ -50,88 +47,55 @@ def obtener_carta_publica():
     return resultado
 
 
-def obtener_carta_staff():
+def obtener_carta_staff(dao=None):
     """Devuelve todas las categorías y platos activos para la gestión del personal."""
-    categorias = consultar_todos(
-        "SELECT categoria_id, nombre, orden, activa "
-        "FROM categoria ORDER BY orden, nombre"
-    )
-
-    platos = consultar_todos(
-        "SELECT p.plato_id, p.categoria_id, c.nombre AS categoria_nombre, "
-        "p.codigo, p.nombre, p.descripcion, p.precio, p.disponible, p.activo "
-        "FROM plato p "
-        "JOIN categoria c ON p.categoria_id = c.categoria_id "
-        "WHERE p.activo = TRUE "
-        "ORDER BY c.orden, c.nombre, p.codigo NULLS LAST, p.nombre"
-    )
-
+    dao = dao or carta_dao_default
+    categorias = dao.listar_todas_categorias()
+    platos = dao.listar_platos_staff()
     return {"categorias": categorias, "platos": platos}
 
 
-def buscar_platos(texto):
+def buscar_platos(texto, dao=None):
     """Busca platos activos por código numérico exacto o por nombre (sin distinguir mayúsculas ni tildes).
     - Si texto son solo dígitos: coincidencia EXACTA por plato.codigo (1 no trae 10 ni 11).
     - Si no: búsqueda por coincidencia parcial en el nombre normalizado.
     """
+    dao = dao or carta_dao_default
     termino = (texto or "").strip()
     if not termino:
-        # Si la búsqueda está vacía, devuelve todos los platos activos
-        return consultar_todos(
-            "SELECT p.plato_id, p.codigo, p.nombre, p.precio, p.disponible, c.nombre AS categoria_nombre "
-            "FROM plato p "
-            "JOIN categoria c ON p.categoria_id = c.categoria_id "
-            "WHERE p.activo = TRUE "
-            "ORDER BY c.orden, p.codigo NULLS LAST, p.nombre"
-        )
+        return dao.listar_platos_staff()
 
     # 1. Búsqueda por código numérico EXACTO
     if termino.isdigit():
-        codigo_num = int(termino)
-        return consultar_todos(
-            "SELECT p.plato_id, p.codigo, p.nombre, p.precio, p.disponible, c.nombre AS categoria_nombre "
-            "FROM plato p "
-            "JOIN categoria c ON p.categoria_id = c.categoria_id "
-            "WHERE p.activo = TRUE AND p.codigo = %s "
-            "ORDER BY p.nombre",
-            (codigo_num,)
-        )
+        return dao.buscar_platos_por_codigo_exacto(int(termino))
 
     # 2. Búsqueda por nombre insensible a mayúsculas y tildes
-    platos_activos = consultar_todos(
-        "SELECT p.plato_id, p.codigo, p.nombre, p.precio, p.disponible, c.nombre AS categoria_nombre "
-        "FROM plato p "
-        "JOIN categoria c ON p.categoria_id = c.categoria_id "
-        "WHERE p.activo = TRUE "
-        "ORDER BY c.orden, p.nombre"
-    )
-
+    platos_activos = dao.listar_platos_staff()
     termino_norm = _normalizar_texto(termino)
     coincidentes = []
     for p in platos_activos:
         nombre_norm = _normalizar_texto(p["nombre"])
-        cat_norm = _normalizar_texto(p["categoria_nombre"])
+        cat_norm = _normalizar_texto(p.get("categoria_nombre", ""))
         if termino_norm in nombre_norm or termino_norm in cat_norm:
             coincidentes.append(p)
 
     return coincidentes
 
 
-def cambiar_disponibilidad_plato(plato_id, disponible):
+def cambiar_disponibilidad_plato(plato_id, disponible, dao=None):
     """Cambia el interruptor 'disponible' (agotado o no) de un plato."""
-    plato = consultar_uno("SELECT plato_id, nombre, disponible, activo FROM plato WHERE plato_id = %s", (plato_id,))
+    dao = dao or carta_dao_default
+    plato = dao.buscar_plato_por_id(plato_id)
     if not plato or not plato["activo"]:
         raise ValueError("El plato especificado no existe o está inactivo.")
 
-    ejecutar(
-        "UPDATE plato SET disponible = %s WHERE plato_id = %s",
-        (bool(disponible), plato_id)
-    )
+    dao.cambiar_disponibilidad(plato_id, bool(disponible))
     return {"plato_id": plato_id, "nombre": plato["nombre"], "disponible": bool(disponible)}
 
 
-def actualizar_precio_plato(plato_id, nuevo_precio):
+def actualizar_precio_plato(plato_id, nuevo_precio, dao=None):
     """Actualiza el precio de un plato."""
+    dao = dao or carta_dao_default
     try:
         precio_val = float(nuevo_precio)
         if precio_val < 0:
@@ -139,21 +103,19 @@ def actualizar_precio_plato(plato_id, nuevo_precio):
     except (TypeError, ValueError):
         raise ValueError("El precio debe ser un número válido mayor o igual a 0.")
 
-    plato = consultar_uno("SELECT plato_id, nombre, activo FROM plato WHERE plato_id = %s", (plato_id,))
+    plato = dao.buscar_plato_por_id(plato_id)
     if not plato or not plato["activo"]:
         raise ValueError("El plato especificado no existe o está inactivo.")
 
-    ejecutar(
-        "UPDATE plato SET precio = %s WHERE plato_id = %s",
-        (precio_val, plato_id)
-    )
+    dao.cambiar_precio(plato_id, precio_val)
     return {"plato_id": plato_id, "nombre": plato["nombre"], "precio": precio_val}
 
 
-def crear_plato(categoria_id, nombre, precio, descripcion=None, codigo=None):
+def crear_plato(categoria_id, nombre, precio, descripcion=None, codigo=None, dao=None):
     """Registra un nuevo plato (solo rol admin).
     Soporta plato.codigo único y opcional (> 0).
     """
+    dao = dao or carta_dao_default
     nombre_limpio = (nombre or "").strip()
     if not nombre_limpio:
         raise ValueError("El nombre del plato es obligatorio.")
@@ -165,7 +127,7 @@ def crear_plato(categoria_id, nombre, precio, descripcion=None, codigo=None):
     except (TypeError, ValueError):
         raise ValueError("El precio debe ser un valor numérico válido.")
 
-    categoria = consultar_uno("SELECT categoria_id FROM categoria WHERE categoria_id = %s", (categoria_id,))
+    categoria = dao.buscar_categoria_por_id(categoria_id)
     if not categoria:
         raise ValueError("La categoría seleccionada no existe.")
 
@@ -179,30 +141,18 @@ def crear_plato(categoria_id, nombre, precio, descripcion=None, codigo=None):
         except (TypeError, ValueError):
             raise ValueError("El código del plato debe ser un número entero positivo.")
 
-        # Verificar unicidad (incluso con platos inactivos para conservar código reservado)
-        existente = consultar_uno(
-            "SELECT plato_id, nombre, activo FROM plato WHERE codigo = %s",
-            (codigo_val,)
-        )
+        existente = dao.buscar_plato_por_codigo(codigo_val)
         if existente:
             estado_txt = " (inactivo)" if not existente["activo"] else ""
             raise ValueError(f"El código {codigo_val} ya está asignado al plato '{existente['nombre']}'{estado_txt}.")
 
     desc_limpia = (descripcion or "").strip() or None
-
-    fila = ejecutar_retornando(
-        """
-        INSERT INTO plato (categoria_id, codigo, nombre, descripcion, precio, disponible, activo)
-        VALUES (%s, %s, %s, %s, %s, TRUE, TRUE)
-        RETURNING plato_id, codigo, nombre, precio
-        """,
-        (categoria_id, codigo_val, nombre_limpio, desc_limpia, precio_val)
-    )
-    return fila
+    return dao.insertar_plato(categoria_id, codigo_val, nombre_limpio, desc_limpia, precio_val)
 
 
-def editar_plato(plato_id, categoria_id, nombre, precio, descripcion=None, codigo=None):
+def editar_plato(plato_id, categoria_id, nombre, precio, descripcion=None, codigo=None, dao=None):
     """Edita los datos de un plato existente."""
+    dao = dao or carta_dao_default
     nombre_limpio = (nombre or "").strip()
     if not nombre_limpio:
         raise ValueError("El nombre del plato es obligatorio.")
@@ -214,11 +164,11 @@ def editar_plato(plato_id, categoria_id, nombre, precio, descripcion=None, codig
     except (TypeError, ValueError):
         raise ValueError("El precio debe ser un valor numérico válido.")
 
-    plato = consultar_uno("SELECT plato_id FROM plato WHERE plato_id = %s", (plato_id,))
+    plato = dao.buscar_plato_por_id(plato_id)
     if not plato:
         raise ValueError("El plato no existe.")
 
-    categoria = consultar_uno("SELECT categoria_id FROM categoria WHERE categoria_id = %s", (categoria_id,))
+    categoria = dao.buscar_categoria_por_id(categoria_id)
     if not categoria:
         raise ValueError("La categoría no existe.")
 
@@ -232,50 +182,35 @@ def editar_plato(plato_id, categoria_id, nombre, precio, descripcion=None, codig
         except (TypeError, ValueError):
             raise ValueError("El código del plato debe ser un número entero positivo.")
 
-        existente = consultar_uno(
-            "SELECT plato_id, nombre, activo FROM plato WHERE codigo = %s AND plato_id != %s",
-            (codigo_val, plato_id)
-        )
+        existente = dao.buscar_plato_por_codigo(codigo_val, excluir_plato_id=plato_id)
         if existente:
             estado_txt = " (inactivo)" if not existente["activo"] else ""
             raise ValueError(f"El código {codigo_val} ya está asignado al plato '{existente['nombre']}'{estado_txt}.")
 
     desc_limpia = (descripcion or "").strip() or None
-
-    ejecutar(
-        """
-        UPDATE plato
-        SET categoria_id = %s, codigo = %s, nombre = %s, precio = %s, descripcion = %s
-        WHERE plato_id = %s
-        """,
-        (categoria_id, codigo_val, nombre_limpio, precio_val, desc_limpia, plato_id)
-    )
-    return {"plato_id": plato_id, "codigo": codigo_val, "nombre": nombre_limpio, "precio": precio_val}
+    return dao.actualizar_plato(plato_id, categoria_id, codigo_val, nombre_limpio, precio_val, desc_limpia)
 
 
-def desactivar_plato(plato_id):
+def desactivar_plato(plato_id, dao=None):
     """Desactiva un plato (NUNCA se borra físicamente; conserva su código reservado)."""
-    plato = consultar_uno("SELECT plato_id, nombre, codigo FROM plato WHERE plato_id = %s", (plato_id,))
+    dao = dao or carta_dao_default
+    plato = dao.buscar_plato_por_id(plato_id)
     if not plato:
         raise ValueError("El plato no existe.")
 
-    # Se marca activo = FALSE y disponible = FALSE, pero se preserva el código
-    ejecutar("UPDATE plato SET activo = FALSE, disponible = FALSE WHERE plato_id = %s", (plato_id,))
+    dao.desactivar_plato(plato_id)
     return {"plato_id": plato_id, "nombre": plato["nombre"], "codigo": plato["codigo"], "activo": False}
 
 
-def crear_categoria(nombre, orden=0):
+def crear_categoria(nombre, orden=0, dao=None):
     """Crea una nueva categoría de platos."""
+    dao = dao or carta_dao_default
     nombre_limpio = (nombre or "").strip()
     if not nombre_limpio:
         raise ValueError("El nombre de la categoría es obligatorio.")
 
-    existente = consultar_uno("SELECT categoria_id FROM categoria WHERE lower(nombre) = lower(%s)", (nombre_limpio,))
+    existente = dao.buscar_categoria_por_nombre(nombre_limpio)
     if existente:
         raise ValueError("Ya existe una categoría con ese nombre.")
 
-    fila = ejecutar_retornando(
-        "INSERT INTO categoria (nombre, orden, activa) VALUES (%s, %s, TRUE) RETURNING categoria_id, nombre",
-        (nombre_limpio, int(orden or 0))
-    )
-    return fila
+    return dao.insertar_categoria(nombre_limpio, int(orden or 0))

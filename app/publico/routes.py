@@ -3,7 +3,7 @@ Aquí se piden reservas y se sigue su estado; toda la lógica vive en app/servic
 """
 from datetime import timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from app.db import consultar_uno
+from app.servicios import configuracion as servicio_configuracion
 from app.servicios import carta as servicio_carta
 from app.servicios import reservas as servicio_reservas
 from app.servicios import pedidos as servicio_pedidos
@@ -12,7 +12,7 @@ publico_bp = Blueprint("publico", __name__)
 
 
 def _config_basica():
-    config = consultar_uno("SELECT nombre_local, abierto FROM config_local WHERE config_id = 1")
+    config = servicio_configuracion.obtener_config_local()
     return {
         "nombre_local": config["nombre_local"] if config else "Quero Gastrobar",
         "abierto": config["abierto"] if config else True,
@@ -22,7 +22,7 @@ def _config_basica():
 @publico_bp.route("/")
 def inicio():
     """Página de inicio pública con información básica y accesos a reservar y pedir."""
-    config = consultar_uno("SELECT nombre_local, abierto, aforo_personas FROM config_local WHERE config_id = 1")
+    config = servicio_configuracion.obtener_config_local()
     nombre_local = config["nombre_local"] if config else "Quero Gastrobar"
     abierto = config["abierto"] if config else True
     return render_template("publico/index.html", nombre_local=nombre_local, abierto=abierto)
@@ -32,7 +32,7 @@ def inicio():
 def carta():
     """Carta pública de platos para clientes, agrupada por categorías activas."""
     carta_datos = servicio_carta.obtener_carta_publica()
-    config = consultar_uno("SELECT nombre_local FROM config_local WHERE config_id = 1")
+    config = servicio_configuracion.obtener_config_local()
     nombre_local = config["nombre_local"] if config else "Quero Gastrobar"
     return render_template("publico/carta.html", carta=carta_datos, nombre_local=nombre_local)
 

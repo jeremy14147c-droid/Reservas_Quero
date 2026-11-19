@@ -5,23 +5,24 @@ Reglas de AGENTS.md sección 7:
 - El correo es opcional y NO es único (nunca se fusionan fichas por correo).
 - Sin cuenta, sin contraseña, sin login de cliente.
 """
-from app.db import consultar_todos, consultar_uno, ejecutar_retornando
+from app.dao.cliente_dao import ClienteDAO
 from app.utils import normalizar_telefono
 
+# Instancia por defecto del DAO
+cliente_dao_default = ClienteDAO()
 
-def obtener_o_crear_cliente(nombre, telefono, correo=None):
+
+def obtener_o_crear_cliente(nombre, telefono, correo=None, dao=None):
     """Devuelve la ficha del cliente con ese teléfono; si no existe, la crea.
     El nombre y el correo solo se guardan cuando el cliente es nuevo: si ya existía
     una ficha con ese teléfono, se conserva su información inicial.
     """
+    dao = dao or cliente_dao_default
     tel = normalizar_telefono(telefono)
     if not tel:
         raise ValueError("El teléfono debe ser un número de 9 dígitos que empiece en 9 (celular de Perú).")
 
-    existente = consultar_uno(
-        "SELECT cliente_id, nombre, telefono, correo, acepta_datos FROM cliente WHERE telefono = %s",
-        (tel,)
-    )
+    existente = dao.buscar_por_telefono(tel)
     if existente:
         return existente
 
@@ -34,11 +35,7 @@ def obtener_o_crear_cliente(nombre, telefono, correo=None):
         raise ValueError("El correo es opcional, pero si se escribe debe ser válido.")
 
     try:
-        return ejecutar_retornando(
-            "INSERT INTO cliente (nombre, telefono, correo, acepta_datos) "
-            "VALUES (%s, %s, %s, TRUE) RETURNING cliente_id, nombre, telefono, correo, acepta_datos",
-            (nombre_limpio, tel, correo_limpio)
-        )
+        return dao.insertar(nombre_limpio, tel, correo_limpio)
     except Exception as e:
         # pgcode 23505 = violación de unicidad (dos personas asignando el teléfono a la vez)
         if getattr(e, "pgcode", None) == "23505":
@@ -46,32 +43,19 @@ def obtener_o_crear_cliente(nombre, telefono, correo=None):
         raise
 
 
-def actividad_24h(cliente_id):
+def actividad_24h(cliente_id, dao=None):
     """Devuelve la fila de la vista v_cliente_actividad_24h para un cliente.
     pedidos_24h + reservas_24h se usan para la insignia de aviso al staff.
     """
+    dao = dao or cliente_dao_default
     if not cliente_id:
         return None
-    return consultar_uno(
-        "SELECT cliente_id, pedidos_24h, reservas_24h, reservas_web_24h "
-        "FROM v_cliente_actividad_24h WHERE cliente_id = %s",
-        (cliente_id,)
-    )
+    return dao.obtener_actividad_24h(cliente_id)
 
 
-def reservas_web_24h(cliente_id):
-    """Cuántas reservas pedidas por la web tiene activas este cliente en las últimas 24 h.
-    Se compara con config_local.max_reservas_web_por_telefono (solo para solicitudes de la web).
+def reservas_web_24h(cliente_id, dao=None):
+    """Devuelve el total de reservas pedidas por la web en las últimas 24 h por ese cliente.
+    Se compara contra config_local.max_reservas_web_por_telefono.
     """
-    fila = actividad_24h(cliente_id)
-    if not fila:
-        return 0
-    return fila["reservas_web_24h"]
-
-
-def tiene_actividad_reciente(cliente_id):
-    """Insignia para el staff: si el cliente pidió o reservó algo (no rechazado/cancelado) en 24 h."""
-    fila = actividad_24h(cliente_id)
-    if not fila:
-        return False
-    return (fila["pedidos_24h"] + fila["reservas_24h"]) > 0
+    dao = dao or cliente_dao_default
+    return dao.contar_reservas_web_24h(cliente_id)

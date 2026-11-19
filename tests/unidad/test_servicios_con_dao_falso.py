@@ -41,6 +41,9 @@ class FalsoReservaDAO:
     def existe_activa_cliente(self, cliente_id, fecha, hora):
         return False
 
+    def consultar_carga_dia(self, fecha, excluir_reserva_id=None):
+        return [{"franja_inicio": time(13, 0), "franja_fin": time(13, 30)}]
+
     def insertar(self, datos):
         return {"reserva_id": 99, "codigo": "Q-ABCDEF", "token": "uuid-test-99", **datos}
 
@@ -58,7 +61,7 @@ class FalsoPedidoDAO:
     def obtener_resumen(self, pedido_id):
         return dict(self.pedido)
 
-    def actualizar_estado(self, pedido_id, nuevo_estado, motivo_rechazo=None):
+    def actualizar_estado(self, pedido_id, nuevo_estado, asignado_tiempo_sql="", motivo_rechazo=None):
         self.pedido["estado"] = nuevo_estado
         self.pedido["motivo_rechazo"] = motivo_rechazo
         return dict(self.pedido)
@@ -69,7 +72,10 @@ class FalsoClienteDAO:
     def __init__(self, reservas_web_24h_val=0):
         self.reservas_web_24h_val = reservas_web_24h_val
 
-    def obtener_o_crear(self, nombre, telefono, correo=None):
+    def buscar_por_telefono(self, telefono):
+        return {"cliente_id": 10, "nombre": "Juan Pérez", "telefono": telefono, "correo": None}
+
+    def insertar(self, nombre, telefono, correo=None):
         return {"cliente_id": 10, "nombre": nombre, "telefono": telefono, "correo": correo}
 
     def contar_reservas_web_24h(self, cliente_id):
@@ -107,7 +113,7 @@ def test_transicion_reserva_rechaza_rechazada_a_confirmada():
         "motivo": "Cancelado"
     })
 
-    with pytest.raises(ValueError, match="No se puede cambiar una reserva"):
+    with pytest.raises(ValueError, match="no se puede cambiar"):
         transicion_reserva(1, "confirmada", dao=falso_dao)
 
 
@@ -120,7 +126,7 @@ def test_pedido_recojo_no_pasa_a_cocina_sin_estar_cobrado():
         "cobrado": False
     })
 
-    with pytest.raises(ValueError, match="no está cobrado"):
+    with pytest.raises(ValueError, match="queda cobrado"):
         transicion_pedido(5, "en_preparacion", dao=falso_dao)
 
 
@@ -141,7 +147,7 @@ def test_tope_reservas_web_por_telefono():
         "acepta_datos": "1"
     }
 
-    with pytest.raises(ValueError, match="límite de reservas por la web"):
+    with pytest.raises(ValueError, match="alcanzó el límite"):
         crear_reserva_web(
             datos,
             dao=falso_reserva_dao,
