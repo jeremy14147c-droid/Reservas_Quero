@@ -1,18 +1,17 @@
-# ESTADO ACTUAL – léelo primero (actualizado el 08/11/2026)
+# ESTADO ACTUAL – léelo primero (actualizado el 19/11/2026)
 
 Archivo para el equipo y el agente. Si algo contradice a otro documento del repo, manda este archivo y luego `AGENTS.md`.
 
 ## 1. Dónde estamos
-- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), y **Fases S1 + S2 de Seguridad (Semana 14)**: sesión revocable, mitigación de temporización, bloqueo por intentos fallidos, redirección segura, logout por POST, política de contraseñas (10+ caracteres), cabeceras de seguridad y convertidor UUID en rutas públicas. **62 pruebas en verde**.
-- La rama `main` tiene todo integrado y la migración `002_seguridad_login_sesion.sql` ya fue aplicada tanto en local como en Neon.
-- Siguiente paso: **Fase 3.R** (capa DAO real y pruebas unitarias sin BD). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
+- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), **Fases S1 + S2 de Seguridad (Semana 14)** (sesión revocable, fuerza bruta, redirect seguro, cabeceras, UUID), y **Fase 3.R (Capa DAO y desacoplamiento)**: 100% del SQL movido a `app/dao/` (`ConfigDAO`, `ClienteDAO`, `PersonalDAO`, `CartaDAO`, `ReservaDAO`, `PedidoDAO`), servicios desacoplados con inyección de DAO, y pruebas unitarias aisladas sin base de datos en `tests/unidad/`. **65 pruebas en verde**.
+- Siguiente paso: **Fase 3.3** (Horas pasadas no reservables y vencimiento automático). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
 
 ## 2. Problemas detectados (verificados)
 1. [RESUELTO en 3.0] `.venv/` ya no está versionado en Git (se eliminó del índice con `git rm -r --cached .venv`). `.env` no está en el historial (revisado).
-2. `DEFENSA_RUBRICA.md` y `GUION_EXPOSICION.md` afirman que hay una capa DAO propia y que se trabaja con TDD ("primero el test"). Hoy **no es cierto**: el SQL está dentro de los servicios (`db.py` solo son helpers) y `git log` muestra que las pruebas se escribieron al final de cada fase. La Fase 3.R lo corrige; hasta entonces no se exponen esas frases.
+2. [RESUELTO en 3.R] `DEFENSA_RUBRICA.md` y `GUION_EXPOSICION.md` actualizados: ahora sí existe la capa DAO por entidad en `app/dao/` y pruebas unitarias con fakes en `tests/unidad/` (sin BD).
 3. [RESUELTO] `ahora_local()` y `hoy()` usan `ZoneInfo("America/Lima")` con el paquete `tzdata`. Funciona idéntico en Windows local y servidores en la nube.
 4. No se valida que la hora reservada ya haya pasado hoy (se puede reservar a las 12:00 pm a las 4:00 pm). Se corrige en la 3.3.
-5. Hay SQL dentro de rutas: `app/auth/routes.py` (3) y `app/publico/routes.py` (3). Se corrige en la 3.R.
+5. [RESUELTO en 3.R] Cero SQL dentro de rutas: `app/auth/routes.py` y `app/publico/routes.py` usan servicios y DAOs. Cero SQL dentro de servicios.
 6. El principio 2.1 de `AGENTS.md` decía que nada se libera solo. Se pidió el vencimiento automático de reservas, así que ahora hay **una excepción explícita** (sección 7). Conviene confirmarla con la dueña.
 
 ## 3. Decisiones ya tomadas
@@ -29,8 +28,8 @@ Archivo para el equipo y el agente. Si algo contradice a otro documento del repo
 | 3.0 | Higiene de Git e integración a `main` | – | Completado en `main` |
 | D | Despliegue en Neon y Render | 3.0 | Desplegado y verificado |
 | S1-S2 | Seguridad OWASP (login, sesión revocable, cabeceras, UUID) | D | Completado (62 tests en verde) |
-| 3.R | Capa DAO real y arranque del TDD | 3.0 | Pendiente |
-| 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R | Pendiente |
+| 3.R | Capa DAO real y arranque del TDD | 3.0 | Completado (65 tests en verde) |
+| 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R | Siguiente |
 | 3.4 | Identidad visual del cliente | 3.3 | Pendiente |
 | 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 | Pendiente |
 | 3.6 | Cocina: imprimir y recojo primero | 3.5 | Pendiente |

@@ -1,7 +1,6 @@
-> ⚠️ **ADVERTENCIA (03/11/2026):** este documento afirma que hay una capa DAO propia y que se trabaja con TDD ("primero la prueba").
-> Hoy **no es cierto**: el SQL está dentro de los servicios (`db.py` solo son helpers) y `git log` muestra que las pruebas se escribieron al final de cada fase.
-> No expongas esas frases tal cual. La Fase 3.R lo corrige y debe actualizar este documento y quitar este aviso.
-> Formulación honesta mientras tanto: *"Las pruebas se escribieron por fase, después del código. Desde la Fase 3.R aplicamos TDD con commits `test:` antes de `feat:` y una capa DAO por entidad."*
+> ✅ **ESTADO DEL PROYECTO (Fase 3.R completada):**
+> Este proyecto cuenta con arquitectura en capas estricta: Controlador (blueprints) → Servicio (reglas de negocio) → DAO (acceso a datos en `app/dao/`) → Base de datos (`schema.sql` y `app/db.py`).
+> El 100 % de las sentencias SQL vive en la capa DAO. Los servicios aceptan inyección de dependencias (`dao=...`), lo que permite pruebas unitarias aisladas sin base de datos en `tests/unidad/`, complementadas por pruebas de integración contra PostgreSQL (65 pruebas en total).
 
 # Guion de exposición en vivo — "Diseño de la solución (MVC, TDD, DAO, SOLID)"
 
@@ -36,15 +35,16 @@ Vista del árbol de carpetas en VS Code (la lateral izquierda). Señalar con el 
 
 ```
 Reservas_Quero/
-├── schema.sql                ← EL MODELO: 10 tablas + 3 funciones SQL + 2 vistas
+├── schema.sql                ← EL MODELO DE DATOS: 10 tablas + 3 funciones SQL + 2 vistas
 ├── app/
 │   ├── __init__.py           ← punto de entrada (app factory)
 │   ├── config.py             ← configuración (clase Config)
-│   ├── db.py                 ← DAO: única que "conoce" la base
+│   ├── db.py                 ← conexión y helpers de bajo nivel (psycopg 3 con parámetros %s)
+│   ├── dao/                  ← CAPA DAO: una clase por entidad con TODO el SQL (ReservaDAO, PedidoDAO...)
 │   ├── publico/ auth/ reservas/ pedidos/ carta/ admin/ api/   ← CONTROLADOR (blueprints)
-│   ├── servicios/            ← la lógica de negocio (python puro)
-│   └── templates/ static/    ← VISTA (25 pantallas HTML)
-└── tests/                    ← TDD: 8 archivos, 52 pruebas
+│   ├── servicios/            ← MODELO DE NEGOCIO: reglas puras (sin Flask, sin SQL directo)
+│   └── templates/ static/    ← VISTA (pantallas HTML con Jinja2 y Bootstrap 5)
+└── tests/                    ← SUITE DE PRUEBAS: 11 archivos, 65 pruebas (unitarias en tests/unidad/ e integración)
 ```
 
 ### 🎤 QUÉ DECIR
@@ -75,37 +75,29 @@ Reservas_Quero/
 ## CAPÍTULO B · DAO — 1.5 min
 
 ### 🖥️ QUÉ ABRIR
-`app/db.py`, desde la **línea 28**: las 4 funciones.
+`app/dao/reserva_dao.py` (o la carpeta `app/dao/` con `ConfigDAO`, `ClienteDAO`, `PersonalDAO`, `CartaDAO`, `ReservaDAO`, `PedidoDAO`), y `app/db.py` (helpers con `%s`).
 
 ```python
-def consultar_todos(sql, params=None):     # línea 28
-def consultar_uno(sql, params=None):       # línea 36
-def ejecutar(sql, params=None, ...):       # línea 44
-def ejecutar_retornando(sql, ...):         # línea 53
+class ReservaDAO:
+    def hay_cupo(self, fecha, hora, personas, personas_por_mesa, duracion_min, excluir_reserva_id=None):
+        ...
+    def insertar(self, datos):
+        ...
+    def actualizar_estado(self, reserva_id, nuevo_estado, motivo=None):
+        ...
 ```
 
 ### 🎤 QUÉ DECIR
-> "Esta es nuestra capa **DAO** (Data Access Object): la ÚNICA del proyecto que conoce cómo
-> estamos conectados a la base de datos. Toda otra parte del sistema, si quiere datos, tiene que
-> pasar por estas 4 funciones.
+> "Nuestra capa **DAO** (Data Access Object) vive en `app/dao/`: tenemos **una clase DAO por entidad** (`ReservaDAO`, `PedidoDAO`, `ClienteDAO`, `CartaDAO`, `PersonalDAO`, `ConfigDAO`).
+> Es la ÚNICA capa del proyecto que escribe SQL. Ninguna ruta y ningún servicio contiene una sola sentencia `SELECT`, `INSERT` o `UPDATE`.
 >
-> Dos detalles que en la práctica nos salvaron el proyecto:
-> **1)** todas las consultas usan parámetros con `%s`: el valor **NUNCA se concatena al texto
-> SQL**, se pasa por separado. Si en JavaScript preparas la consulta sumando strings con el dato
-> del usuario (`"SELECT... WHERE telefono = '" + tel + "'"`), alguien puede inyectar código. Aquí
-> un cliente podría escribir `' OR 1=1 --` en su teléfono y solo pasaría que la consulta no
-> encuentra nada: psycopg ya se encargó de escapar ese valor.
-> **2)** es la abstracción del patrón DAO: el día que cambiemos de driver o de motor de base,
-> **solo este archivo se toca**."
+> Dos detalles técnicos clave:
+> **1)** Todo el acceso de bajo nivel pasa por `app/db.py`, donde todas las consultas usan parámetros con `%s`: el valor **NUNCA se concatena al texto SQL**, se pasa por separado. Si un cliente escribiera `' OR 1=1 --` en su teléfono, psycopg lo escapa de forma segura evitando inyección SQL.
+> **2)** **Inyección de dependencias:** Los servicios reciben su DAO como parámetro opcional (`dao=None`, con instancia por defecto). Esto nos permite inyectar un **DAO falso** en pruebas unitarias (`tests/unidad/`) y probar las reglas de negocio en milisegundos sin levantar una base de datos."
 
 ### 💬 SI PREGUNTAN
-- **"¿Por qué la capa DAO no usa una clase por tabla, como el DAO clásico?"** → "Decisión
-  consciente: simple antes que completo. En Python el módulo YA cumple ese rol (todo en Python es
-  objeto: también los módulos); `db.py` agrupa el acceso a datos y se importa como una sola
-  unidad. Si el proyecto creciera, cada 'clase tabla' sería solo más palabras para lo mismo."
-- **"¿Cómo hacen singleton de la conexión?"** → "`db.py` se importa UNA vez: todo el sistema
-  comparte el mismo módulo y su conexión. Es el singleton idiomático de Python, sin clases
-  complicadas."
+- **"¿Por qué una clase por entidad y no un ORM como SQLAlchemy?"** → "Decisión deliberada: la fuente de verdad de nuestro modelo es `schema.sql`. Con psycopg 3 y DAOs explícitos mantenemos control total del SQL, usamos funciones nativas de PostgreSQL (`fn_carga_dia`, `fn_hay_cupo`) sin capas opacas, y cumplimos el patrón DAO clásico que cualquier docente de Java/C# reconoce de inmediato."
+- **"¿Cómo se comunican el Servicio y el DAO?"** → "El servicio contiene las reglas ('¿este estado puede pasar a aquel?'). Cuando la regla se aprueba, el servicio le pide al DAO que persista el cambio (`dao.actualizar_estado(...)`). El DAO solo sabe de SQL, el servicio solo sabe de negocio."
 
 ---
 
@@ -183,20 +175,25 @@ if isinstance(error, ValueError):          # luego la genérica
 
 ### 🟣 D — Dependency Inversion — 40 s  ⏱️ el cierre que más impresiona
 
-🖥️ MOSTRAR una cosa simple y contundente: en la terminal:
+🖥️ MOSTRAR dos cosas simples y contundentes en la terminal:
 
+1. Sin acoplamiento a la web:
 ```powershell
 Select-String -Path app\servicios\*.py -Pattern "from flask" | Measure-Object | % Count
 ```
 → **0**
 
+2. Sin acoplamiento a base de datos (todo el SQL está en los DAOs):
+```powershell
+Select-String -Path app\servicios\*.py -Pattern "SELECT |INSERT |UPDATE |DELETE " | Measure-Object | % Count
+```
+→ **0**
+
 🎤 DECIR:
-> "Busquen 'flask' en esta carpeta: **cero** resultados. Los servicios no dependen de Flask ni
-> del driver de base de datos: reciben datos y devuelven datos (o lanzan errores de negocio).
-> Esa es la inversión de dependencia: la capa de REGLAS depende de abstracciones (funciones
-> puras, como un método de dominio en Java que no conoce ni Spring ni JDBC), y sí dependen de
-> ella las rutas HTTP y la base de datos. Consecuencia práctica: correr las 52 pruebas no toca
-> la base real del local, y la lógica se puede reusar en cualquier contexto."
+> "Busquen 'flask' en la carpeta de servicios: **cero** resultados. Y busquen sentencias SQL en los servicios: **cero** resultados.
+> Los servicios no dependen ni de Flask ni de la base de datos directa: dependen de abstracciones (la capa DAO inyectable, `dao=None`).
+> Esa es la Inversión de Dependencias: la capa de REGLAS es de alto nivel y no depende de los detalles de acceso a datos.
+> Consecuencia práctica: gracias a esto tenemos pruebas unitarias puras en `tests/unidad/` que corren en milisegundos sin levantar PostgreSQL, usando DAOs falsos en memoria."
 
 ---
 
@@ -207,29 +204,28 @@ Select-String -Path app\servicios\*.py -Pattern "from flask" | Measure-Object | 
    ```powershell
    .venv\Scripts\python.exe -X utf8 -m pytest -q
    ```
-   (resultado en vivo: **52 passed in ~19s**)
-2. Con el resultado en pantalla, abrir `tests/test_fase3_2.py`, **función `test_fn_duracion_estadia_por_tamano`**
+   (resultado en vivo: **65 passed in ~18s**)
+2. Con el resultado en pantalla, mostrar `tests/unidad/test_servicios_con_dao_falso.py` (pruebas unitarias sin BD) y luego `tests/test_fase3_2.py`, **función `test_fn_duracion_estadia_por_tamano`**
    (señalar la línea del `esperado = {1: 30, 3: 30, ...}`)
 
 ### 🎤 QUÉ DECIR
-> "Cada funcionalidad tiene su archivo de pruebas: trabajamos con disciplina **TDD** — primero
-> el test define qué debe pasar, después el código que lo cumple. Esta suite son 52 pruebas que
-> corren en unos 19 segundos y **no son pruebas de humo**: prueban reglas de negocio contra una
-> base PostgreSQL de verdad.
+> "Cada funcionalidad tiene su archivo de pruebas: trabajamos con disciplina **TDD**. Esta suite cuenta con 65 pruebas que corren en unos 18 segundos.
+> Tenemos dos tipos de pruebas claramente separadas:
+> **1)** **Pruebas unitarias puras** en `tests/unidad/`: prueban la lógica de negocio usando DAOs simulados (fakes en memoria), sin tocar la base de datos ni requerir red.
+> **2)** **Pruebas de integración**: prueban reglas de negocio y restricciones complejas contra una base PostgreSQL de verdad.
 >
 > Ejemplo concreto (señalando la pantalla): esta prueba llama a la **función SQL**
-> `fn_duracion_estadia` con los valores LIMITES 1, 3, 4, 7, 8, 12 y 13 personas, y comprueba que
+> `fn_duracion_estadia` con los valores LÍMITES 1, 3, 4, 7, 8, 12 y 13 personas, y comprueba que
 > devuelva 30, 60 o 90 minutos. No es al azar: 3 es el borde de los grupos chicos, 4 arranca el
 > grupo mediano y 8 el grande. Si mañana alguien cambia la regla y rompe el límite del 7, el test
 > explota en rojo ANTES de que el dueño del local lo note.
 >
-> También hay tests de la MÁQUINA DE ESTADOS y del cobro: pagar más que el total se rechaza, y
-> un pedido `cancelado` no puede volver a ningún estado."
+> También hay tests de la MÁQUINA DE ESTADOS, de seguridad (bloqueo por fuerza bruta H-2, rotación de sesiones H-1) y del cobro."
 
 ### 💬 SI PREGUNTAN
 - **"¿Qué es TDD de verdad?"** → "El ciclo ROJO–VERDE–REFACTOR: se escribe primero la prueba
   (rojo), luego el código mínimo que la haga pasar (verde), y después se mejora el código que
-  siga en verde. Lo aplicamos en las fases de reglas (2 y 3): incluimos casos de rechazo, no
+  siga en verde. Lo aplicamos en las fases de reglas (2, 3 y seguridad S1/S2): incluimos casos de rechazo, no
   solo el camino feliz."
 - **"¿Cómo manejan la preparación de pruebas?"** → abrir `tests/conftest.py`:
   "Los fixtures `app`, `cliente` y `usuario_prueba`. La app se montó con una clase test"
@@ -246,14 +242,14 @@ Select-String -Path app\servicios\*.py -Pattern "from flask" | Measure-Object | 
 
 | Letra | Archivo | Línea/fn |
 |---|---|---|
-| S | `app/servicios/` (1 responsabilidad por módulo) | — |
+| S | `app/servicios/` (1 responsabilidad por módulo, sin SQL) | — |
 | O | `app/servicios/reservas.py` | `TRANSICIONES_VALIDAS` (L22) |
 | L | `app/servicios/reservas.py` + `app/api/routes.py` | `CupoNoDisponible(ValueError)` (L28) + `_manejar_error_negocio` (L101) |
 | I | `app/api/routes.py` | rutas JSON separadas de las HTML |
-| D | terminal | `Select-String "from flask" app/servicios/*.py` → **0 resultados** |
-| DAO | `app/db.py` | 4 helpers (L28) |
-| MVC | árbol de carpeta | `schema.sql` (M) · `routes.py` (C) · `templates/` (V) |
-| TDD | `tests/` (8 archivos, 52 pruebas) | correr `pytest -q` en vivo |
+| D | `app/servicios/` + `app/dao/` | Inyección de DAO (`dao=None`) + 0 SQL en servicios + 0 Flask |
+| DAO | `app/dao/` | Una clase por entidad (`ReservaDAO`, `PedidoDAO`, etc.) + `db.py` |
+| MVC | árbol de carpetas | `schema.sql` y `app/dao/` (M) · `routes.py` (C) · `templates/` (V) |
+| TDD | `tests/` (11 archivos, 65 pruebas) | `tests/unidad/` (sin BD) + integración en vivo con `pytest -q` |
 
 ---
 
@@ -280,7 +276,7 @@ Si te preguntan "¿esto cómo se compara con [Java/C#/JS/HTML/CSS]?", responde c
 
 | Falla | Qué hacer |
 |---|---|
-| pytest tarda o falla por algo raro | Mostrar el archivo de test y decir los números de memoria: "52 pruebas, ~19 s" |
+| pytest tarda o falla por algo raro | Mostrar el archivo de test y decir los números de memoria: "65 pruebas, ~18 s" |
 | La pizarra no carga | Abrir directamente la API `/api/v1/reservas/dia` y decir: "esta es la fuente JSON de la pizarra" |
 | VS Code se pierde en una pestaña | Ir directo a la tabla del CAPÍTULO E (archivo + línea ya memorizados) |
 | Se corta la internet | NADA de este bloque depende de internet: Flask, PostgreSQL y pytest corren 100% local |

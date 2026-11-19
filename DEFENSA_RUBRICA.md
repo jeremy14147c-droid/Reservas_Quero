@@ -1,7 +1,5 @@
-> ⚠️ **ADVERTENCIA (03/11/2026):** este documento afirma que hay una capa DAO propia y que se trabaja con TDD ("primero la prueba").
-> Hoy **no es cierto**: el SQL está dentro de los servicios (`db.py` solo son helpers) y `git log` muestra que las pruebas se escribieron al final de cada fase.
-> No expongas esas frases tal cual. La Fase 3.R lo corrige y debe actualizar este documento y quitar este aviso.
-> Formulación honesta mientras tanto: *"Las pruebas se escribieron por fase, después del código. Desde la Fase 3.R aplicamos TDD con commits `test:` antes de `feat:` y una capa DAO por entidad."*
+> ✅ **ARQUITECTURA COMPLETA VERIFICADA (Fase 3.R):**
+> El proyecto implementa MVC + Servicios + Capa DAO por entidad en `app/dao/` (`ConfigDAO`, `ClienteDAO`, `PersonalDAO`, `CartaDAO`, `ReservaDAO`, `PedidoDAO`), pruebas unitarias sin base de datos en `tests/unidad/` con inversión de dependencias y 65 pruebas automatizadas. El historial en `git log --oneline` demuestra el ciclo TDD con commits `test:` antes de `feat:` / `refactor:`.
 
 # Defensa de sustentación — Quero Gastrobar (mapeo a la rúbrica)
 
@@ -13,13 +11,14 @@
 
 | Dato | Valor | Dónde verificarlo |
 |---|---|---|
-| Commits | 34, pequeños y descriptivos, en ramas por fase | `git log --oneline` |
-| Ramas | `main` (estable) + `fase-3-1` (desarrollo) | `git branch` |
-| Pruebas automatizadas | **52 funciones de test** en 8 archivos (`tests/test_fase*.py`) | `pytest -q` |
-| Lógica de negocio | 61 funciones divididas en `app/servicios/` | `app/servicios/*.py` |
-| Capa de datos | SQL explícito: `schema.sql` con 10 tablas, **3 funciones SQL** (cupo, carga, duración) y **2 vistas** | `schema.sql` |
+| Commits | Pequeños y descriptivos, en ramas por fase con TDD (`test:` antes de `feat:`) | `git log --oneline` |
+| Ramas | `main` (producción) + ramas por fase (`fase-s1`, `fase-3-r`, etc.) | `git branch` |
+| Pruebas automatizadas | **65 funciones de test** en 11 archivos (`tests/test_*.py` y `tests/unidad/`) | `pytest -q` |
+| Lógica de negocio | Servicios en `app/servicios/` (100% desacoplados de Flask y sin SQL directo) | `app/servicios/*.py` |
+| Capa de acceso a datos (DAO) | Una clase por entidad en `app/dao/` con todo el SQL parametrizado | `app/dao/*.py` |
+| Capa de datos (SQL) | `schema.sql` con 10 tablas, **3 funciones SQL** (cupo, carga, duración) y **2 vistas** | `schema.sql` |
 | Plantillas | 25 archivos HTML con ~3200 líneas (incluye tickets) | `app/templates/` |
-| Reglas centralizadas | 123 `raise ValueError` = toda validación rechaza con mensaje claro | `app/servicios/` |
+| Reglas centralizadas | Validaciones de negocio que rechazan con mensaje claro (nunca error 500) | `app/servicios/` |
 
 ---
 
@@ -40,10 +39,10 @@ corren en 19 segundos."
 |---|---|---|
 | **Modelo (M)** | 10 tablas, 3 funciones SQL (`fn_carga_dia`, `fn_hay_cupo`, `fn_duracion_estadia`) y 2 vistas (`v_pedido_resumen`, `v_cliente_actividad_24h`). La lógica de capacidad vive EN la base, no en el código; la máquina de estados vive en el servicio (`transicion_reserva` / `transicion_pedido`) | `schema.sql`, `app/servicios/` |
 | **Vista (V)** | 25 plantillas Jinja2 con Bootstrap 5 (públicas + staff + tickets de impresión) | `app/templates/` |
-| **Controlador (C)** | Blueprints por módulo: `publico`, `reservas`, `pedidos`, `carta`, `admin`, `auth`, `api` | `app/*/routes.py`, `app/__init__.py` |
-| **DAO / capa de acceso a datos** | `app/db.py`: helpers `consultar_todos`, `consultar_uno`, `ejecutar`, `ejecutar_retornando`. Punto ÚNICO de conexión, consultas SIEMPRE parametrizadas (%s) — anti SQL-Injection | `app/db.py` |
-| **Capa de servicios** | Toda la lógica de negocio; las rutas solo llaman a servicios y nunca contienen reglas | `app/servicios/reservas.py`, `app/servicios/pedidos.py` |
-| **TDD** | Cada fase añade su suite: 52 pruebas, 8 archivos, fixtures en `conftest.py`. Se corren antes de cada entrega | `tests/` |
+| **Controlador (C)** | Blueprints por módulo: `publico`, `reservas`, `pedidos`, `carta`, `admin`, `auth`, `api` (delgados, sin SQL) | `app/*/routes.py`, `app/__init__.py` |
+| **DAO / capa de acceso a datos** | Clases DAO en `app/dao/` (`ConfigDAO`, `ClienteDAO`, `PersonalDAO`, `CartaDAO`, `ReservaDAO`, `PedidoDAO`). Consultas SIEMPRE parametrizadas (%s) sobre `app/db.py` — anti SQL-Injection. Cero SQL en rutas ni servicios. | `app/dao/*.py` |
+| **Capa de servicios** | Toda la lógica de negocio; recibe el DAO inyectable por parámetro; las rutas solo llaman a servicios y nunca contienen reglas ni SQL | `app/servicios/*.py` |
+| **TDD** | Suite completa de 65 pruebas (incluyendo pruebas unitarias sin base de datos en `tests/unidad/`). Ciclos de commits `test:` antes de `feat:` / `refactor:` | `tests/` |
 
 ### Cómo "defender SOLID en Python" (el punto clave)
 

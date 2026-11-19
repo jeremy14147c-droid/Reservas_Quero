@@ -15,17 +15,18 @@ Una web con backend se organiza como un restaurante. Es la mejor forma de no per
 | **La carta** (lo que ve el cliente) | Plantillas HTML | `app/templates/` | HTML + CSS |
 | **El mozo** (recibe el pedido y lo lleva) | Rutas | `app/*/routes.py` | Un `addEventListener`, pero para URLs |
 | **La cocina** (donde están las reglas) | Servicios | `app/servicios/` | Las clases con la lógica de negocio en POO |
-| **El almacén** (donde se guarda todo) | Base de datos PostgreSQL | `schema.sql` | Donde vive la información |
+| **El bodeguero** (busca y guarda en estantes) | Capa DAO (Data Access Object) | `app/dao/` | Clases que contienen todo el SQL |
+| **El almacén** (donde se guarda todo) | Base de datos PostgreSQL | `schema.sql` + `app/db.py` | Donde vive la información |
 | **El jefe de sala** (quién entra y adónde) | Login y roles | `app/auth/` | Control de acceso |
 
-**Regla de oro del proyecto** (está en `AGENTS.md`): el mozo no cocina. Las rutas solo reciben y entregan; las reglas ("¿hay cupo?", "¿puede pasar de pendiente a confirmada?") viven en `servicios/`. Esto es lo que más importa para SOLID (sección 9).
+**Regla de oro del proyecto** (está en `AGENTS.md`): el mozo no cocina y el cocinero no va a revolver el almacén. Las rutas solo reciben y entregan; las reglas ("¿hay cupo?", "¿puede pasar de pendiente a confirmada?") viven en `servicios/`; y el acceso a la base de datos vive exclusivamente en `app/dao/`. Esto es lo que más importa para SOLID (sección 9).
 
 **El camino de cualquier acción:**
 
 ```
-Navegador  →  Ruta (mozo)  →  Servicio (cocina)  →  Base de datos (almacén)
-   ↑                                                        │
-   └──────────── HTML o JSON de vuelta ←────────────────────┘
+Navegador  →  Ruta (mozo)  →  Servicio (cocina)  →  DAO (bodeguero)  →  Base de datos (almacén)
+   ↑                                                                               │
+   └──────────── HTML o JSON de vuelta ←───────────────────────────────────────────┘
 ```
 
 ---
@@ -74,7 +75,8 @@ Reservas_Quero/
 └── app/
     ├── __init__.py      ← create_app(): arma toda la aplicación.
     ├── config.py        ← Lee el .env y guarda la configuración.
-    ├── db.py            ← 5 funciones para hablar con PostgreSQL.
+    ├── db.py            ← Conexión de bajo nivel y helpers (%s) para hablar con PostgreSQL.
+    ├── dao/             ← Capa DAO: una clase por entidad (ReservaDAO, PedidoDAO...) con TODO el SQL.
     ├── utils.py         ← Herramientas sueltas (normalizar teléfono, QR, formato de hora).
     ├── publico/         ← Rutas del cliente: /, /carta, /reservar, /reserva/<token>
     ├── auth/            ← Login, logout, roles.
@@ -286,12 +288,11 @@ Primero lo importante y poco cómodo: **este proyecto es sobre todo programació
 
 Una advertencia antes de presumir: **si dices "cumple todo SOLID", la profesora puede desmontarlo en un minuto.** Si dices "cumple S, O y D en parte, y estos son los puntos débiles", demuestras que entendiste. Eso vale más.
 
-### S: Responsabilidad única: *cumple a medias*
-**A favor:** cada capa hace una sola cosa. Rutas = HTTP; servicios = reglas; `db.py` = acceso a datos; `templates/` = presentación; `config.py` = configuración. Cada servicio es de un tema (`clientes`, `carta`, `personal`).
+### S: Responsabilidad única: *cumple sólidamente desde la Fase 3.R*
+**A favor:** cada capa hace una sola cosa. Rutas = peticiones HTTP y respuestas; servicios = reglas de negocio puras; `app/dao/` = capa DAO con una clase por entidad que concentra el 100% del SQL (`ReservaDAO`, `PedidoDAO`, `ClienteDAO`, etc.); `db.py` = conector y helper de bajo nivel (`%s`); `templates/` = presentación; `config.py` = configuración.
+En la Fase 3.R se eliminaron todas las consultas directas de las rutas (`publico/routes.py` y `auth/routes.py`), redirigiéndolas a sus servicios y DAOs correspondientes.
 
-**En contra, con evidencia:**
-- `publico/routes.py` hace `consultar_uno("SELECT ...")` **tres veces** (líneas 14, 24 y 34) y `auth/routes.py` accede a la base en tres puntos. Eso **rompe la regla del propio proyecto** ("las rutas no tocan la base").
-- `servicios/reservas.py` tiene **542 líneas** con validaciones, cupo, estados, semáforo público y armado de la pizarra. Son varias responsabilidades en un solo archivo.
+**Punto de mejora a reconocer:** `servicios/reservas.py` sigue siendo un módulo amplio que concentra validaciones, ciclo de vida de estados y armado de la pizarra.
 
 ### O: Abierto/Cerrado: *cumple bien*
 **A favor:** agregar un estado de reserva es agregar una entrada a `TRANSICIONES_VALIDAS`, sin tocar la función que valida. `requiere_rol(*roles)` acepta cualquier combinación de roles sin modificarse. Agregar un módulo nuevo es crear un blueprint y sumar **una línea** en `create_app`.
@@ -303,32 +304,30 @@ Hay dos casos reales: `CupoNoDisponible(ValueError)` se puede usar donde se espe
 ### I: Segregación de interfaces: *aceptable, débil como evidencia*
 Python no tiene interfaces. Se cumple de forma indirecta: módulos chicos y funciones pequeñas, y cada ruta importa **solo el servicio que usa** (`from app.servicios import carta as servicio_carta`). No obliga a nadie a depender de lo que no usa. Es un argumento razonable, pero no es una demostración.
 
-### D: Inversión de dependencias: *cumple en parte*
+### D: Inversión de dependencias: *cumple ampliamente desde la Fase 3.R*
 **A favor:**
-- `create_app(config_class=Config)` **recibe** la configuración en vez de fijarla dentro. Las pruebas pasan `TestConfig` y no cambian una sola línea de la app. Es inyección de dependencias real.
+- `create_app(config_class=Config)` **recibe** la configuración en vez de fijarla dentro. Las pruebas pasan `TestConfig` y no cambian una sola línea de la app.
 - `obtener_usuario_actual()` es una abstracción: las rutas dependen de **esa función**, no de cómo se guarda la sesión.
-
-**En contra:** los servicios importan `app.db` directo (`from app.db import consultar_uno...`). Dependen de la implementación concreta, no de una abstracción. Por eso las pruebas necesitan la base real.
+- **Inyección de dependencias en servicios (Fase 3.R):** los servicios reciben su DAO como parámetro opcional (`dao=None`, con instancia por defecto). Esto rompe la dependencia rígida con PostgreSQL y permite pasar un DAO falso (`FalsoReservaDAO`) en `tests/unidad/test_servicios_con_dao_falso.py`, ejecutando pruebas unitarias de negocio en milisegundos sin base de datos.
+- Los servicios NO importan Flask (`from flask` da 0 resultados en `app/servicios/`) y NO ejecutan SQL directamente.
 
 ### Resumen
 
 | Principio | Valoración | Argumento más fuerte |
 |---|---|---|
-| S | Parcial | Capas separadas; pero 3 rutas tocan la BD y `reservas.py` es muy grande |
+| S | Bueno | Capas estrictas (Ruta → Servicio → DAO → BD); rutas sin SQL, servicios sin SQL |
 | O | Bueno | `TRANSICIONES_VALIDAS`, `requiere_rol(*roles)`, blueprints |
-| L | Poco aplicable | Solo 2 herencias |
+| L | Poco aplicable | Herencia acotada: `CupoNoDisponible(ValueError)` |
 | I | Aceptable | Módulos pequeños y dependencias mínimas |
-| D | Parcial | `create_app(config_class)` y `obtener_usuario_actual()` |
+| D | Fuerte | Inyección de DAO (`dao=None`) para pruebas unitarias sin BD, `create_app(config_class)` |
 
 ### Cómo decirlo en la exposición
-> "Usamos arquitectura en capas con *service layer*: rutas, servicios y acceso a datos separados. Cumple claramente **Abierto/Cerrado** (estados como datos y decoradores parametrizados) y en parte **Responsabilidad única** e **Inversión de dependencias** (configuración inyectada en la fábrica de la app). **Liskov** e **Interfaces** aplican poco porque el diseño es modular y no jerárquico. Identificamos dos puntos a mejorar: algunas rutas consultan la base directamente y el servicio de reservas debería dividirse."
+> "Usamos arquitectura en capas con *service layer* y capa DAO: rutas, servicios, DAOs y acceso a datos estrictamente separados. Cumple **Responsabilidad única** (cero SQL en rutas ni servicios), **Inversión de dependencias** (servicios con inyección de DAO para pruebas unitarias sin base de datos y configuración inyectada en la app factory) y **Abierto/Cerrado** (estados como datos y decoradores parametrizados). **Liskov** e **Interfaces** aplican poco porque el diseño es modular y no jerárquico."
 
-### Mejoras baratas que subirían la nota (no están hechas)
-1. En `publico/routes.py`, cambiar los `consultar_uno(...)` por `servicios/configuracion.obtener_config_local()`, que **ya existe**. Mueve las lecturas a su capa.
-2. Mover las consultas de `auth/routes.py` a `servicios/personal.py`.
-3. Dividir `servicios/reservas.py` en `validaciones`, `cupo`, `ciclo_vida` y `pizarra`.
-
-Si quieres, le pido a Antigravity las tres como "Fase 2.1", con la condición de que las pruebas sigan en verde.
+### Mejoras realizadas en la Fase 3.R:
+1. En `publico/routes.py`, se reemplazaron los `consultar_uno(...)` directos por `servicio_configuracion.obtener_config_local()`.
+2. En `auth/routes.py` y `auth/usuario.py`, las consultas SQL se movieron a `PersonalDAO`.
+3. Se creó la carpeta `app/dao/` con clases especializadas por entidad y pruebas unitarias aisladas en `tests/unidad/`.
 
 ---
 
