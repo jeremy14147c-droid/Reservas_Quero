@@ -95,6 +95,7 @@ Todo lo que la dueña ajusta vive aquí, no en el código. `config_id = 1` (con 
 | `hora_apertura` | TIME. Es hora del día, sin fecha. | NOT NULL. Sin ella no se generan franjas. | Inicio del horario reservable y de la pizarra. | OK |
 | `hora_cierre` | TIME. | NOT NULL. Debe ser mayor que la apertura (`ck_config_horario`). | Fin del horario. **No permite cerrar pasada la medianoche.** | D9 |
 | `dias_max_anticipacion` | INT, CHECK ≥ 0. | NOT NULL. 0 = solo se reserva para hoy. | Con cuántos días de anticipación se puede reservar. La web lo usa para limitar el calendario. | OK |
+| `anticipacion_min_min` | SMALLINT, DEFAULT 30, CHECK ≥ 0. | NOT NULL. Si no se indica, 30. | Minutos de anticipación mínima para reservar por la web. Las franjas que inician antes de `ahora + anticipacion_min_min` se muestran deshabilitadas ("Ya pasó"). | Nuevo |
 | `porcentaje_reservable` | SMALLINT, CHECK entre 1 y 100. | **NULL permitido, a propósito.** Vacío = 100 %, sin límite adicional. | Qué porcentaje de personas y mesas pueden ocupar las **reservas**; el resto queda libre para quien llega sin reserva. | OK |
 | `abierto` | BOOLEAN, DEFAULT TRUE. | NOT NULL. Por defecto abierto. | Indicaría si el local está abierto. **Hoy ninguna pantalla lo usa.** | D1 |
 | `yape_numero` | VARCHAR(15). Texto porque es un número de contacto, no se hacen cuentas con él. | **NULL permitido.** Si queda vacío, la pantalla de pago no tiene qué mostrar. Hay que llenarlo antes de aceptar pedidos de recojo. | Número al que el cliente paga por Yape. | OK |
