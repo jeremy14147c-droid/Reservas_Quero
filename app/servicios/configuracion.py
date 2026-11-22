@@ -117,6 +117,13 @@ def actualizar_config_local(datos, dao=None):
     except (TypeError, ValueError):
         raise ValueError("Los días de anticipación deben ser un número entero positivo.")
 
+    try:
+        anticipacion_min = int(datos.get("anticipacion_min_min", 30))
+        if anticipacion_min < 0:
+            raise ValueError("Los minutos de anticipación mínima deben ser mayores o iguales a 0.")
+    except (TypeError, ValueError):
+        raise ValueError("La anticipación mínima debe ser un número entero mayor o igual a 0.")
+
     porc_reservable = datos.get("porcentaje_reservable")
     porc_reservable_val = None
     if porc_reservable not in (None, ""):
@@ -148,6 +155,7 @@ def actualizar_config_local(datos, dao=None):
         hora_apertura,
         hora_cierre,
         dias_max,
+        anticipacion_min,
         porc_reservable_val,
         abierto,
         yape_numero,

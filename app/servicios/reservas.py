@@ -107,6 +107,46 @@ def _a_hora(valor):
         return None
 
 
+def franja_reservable(fecha, hora_inicio, minutos_franja, ahora, canal="web", anticipacion_min=30):
+    """Regla pura sin base de datos que determina si una franja es reservable.
+    - Días futuros: siempre reservable (True, None).
+    - Días pasados: nunca reservable (False, "Ese día ya pasó.").
+    - Mismo día:
+        - Web: reservable si hora_inicio >= ahora + anticipacion_min.
+        - Staff: reservable si el fin de la franja > ahora (permite franja en curso).
+    Retorna (reservable: bool, motivo: str | None).
+    """
+    if isinstance(fecha, str):
+        fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
+    hora = _a_hora(hora_inicio)
+    if hora is None:
+        return False, "Formato de hora inválido."
+
+    dia_ahora = ahora.date()
+    if fecha < dia_ahora:
+        return False, "Ese día ya pasó."
+    if fecha > dia_ahora:
+        return True, None
+
+    tz = ahora.tzinfo
+    inicio_dt = datetime.combine(fecha, hora, tzinfo=tz)
+
+    if canal == "web":
+        limite = ahora + timedelta(minutes=anticipacion_min)
+        if inicio_dt < limite:
+            return (
+                False,
+                f"Esa hora ya pasó. Elige una hora posterior; se necesitan al menos {anticipacion_min} min de anticipación.",
+            )
+        return True, None
+
+    # canal staff
+    fin_dt = inicio_dt + timedelta(minutes=minutos_franja)
+    if fin_dt <= ahora:
+        return False, "Esa franja horaria ya terminó."
+    return True, None
+
+
 # ---------------------------------------------------------------- cupo (funciones SQL)
 
 def hay_cupo(fecha, hora, personas, excluir_reserva=None, dao=None):
@@ -121,11 +161,43 @@ def carga_dia(fecha, excluir_reserva=None, dao=None):
     return dao.consultar_carga_dia(fecha, excluir_reserva)
 
 
+# ---------------------------------------------------------------- vencimiento automático (AGENTS.md sección 7)
+
+def liberar_reservas_vencidas(ahora=None, dao=None):
+    """Cierra de forma automática y perezosa las reservas vencidas:
+    - pendiente cuya hora ya pasó -> rechazada ('Vencida: nadie la atendió a tiempo')
+    - confirmada cuya ocupación de mesa terminó -> no_llego ('Automático: no se registró la llegada')
+    - llego no cambia.
+    Devuelve un diccionario con el total y desglose de cerradas.
+    """
+    dao = dao or reserva_dao_default
+    ahora = ahora or ahora_local()
+    rechazadas = dao.liberar_pendientes_vencidas(ahora)
+    no_llegaron = dao.liberar_confirmadas_vencidas(ahora)
+    return {
+        "pendientes_rechazadas": rechazadas,
+        "confirmadas_no_llego": no_llegaron,
+        "total": rechazadas + no_llegaron,
+    }
+
+
 # ---------------------------------------------------------------- semáforo público
 
-def horarios_con_semaforo(fecha, dao=None):
-    """Lista de franjas del día con el semáforo del cliente: disponible / pocas / lleno."""
+def horarios_con_semaforo(fecha, dao=None, config_dao=None, ahora=None):
+    """Lista de franjas del día con el semáforo del cliente: disponible / pocas / lleno,
+    e indicador de si la franja ya pasó ('pasada').
+    """
     dao = dao or reserva_dao_default
+    config_dao = config_dao or config_dao_default
+    ahora = ahora or ahora_local()
+
+    # Vencimiento perezoso
+    liberar_reservas_vencidas(ahora=ahora, dao=dao)
+
+    config = obtener_config(config_dao)
+    anticipacion_min = config.get("anticipacion_min_min", 30)
+    franja_min = config.get("franja_min", 30)
+
     resultado = []
     for franja in carga_dia(fecha, dao=dao):
         personas_libres = franja["personas_libres"]
@@ -139,11 +211,23 @@ def horarios_con_semaforo(fecha, dao=None):
                 ocupacion = max(ocupacion, franja["personas"] / limite_personas * 100)
             semaforo = "pocas" if ocupacion >= (100 - Config.PORC_POCAS) else "disponible"
 
+        hora_inicio = franja["franja_inicio"]
+        reservable, _ = franja_reservable(
+            fecha,
+            hora_inicio,
+            franja_min,
+            ahora,
+            canal="web",
+            anticipacion_min=anticipacion_min,
+        )
+        pasada = not reservable
+
         resultado.append({
-            "hora": franja["franja_inicio"],
-            "hora_12h": formato_hora_12h(franja["franja_inicio"]),
+            "hora": hora_inicio,
+            "hora_12h": formato_hora_12h(hora_inicio),
             "semaforo": semaforo,
-            "disponible": semaforo != "lleno",
+            "disponible": (semaforo != "lleno") and not pasada,
+            "pasada": pasada,
         })
     return resultado
 
@@ -196,16 +280,26 @@ def _rechazo_por_reserva_duplicada(cliente_id, fecha, hora, dao=None):
         )
 
 
-def crear_reserva_web(datos, dao=None, cliente_dao=None, config_dao=None):
+def crear_reserva_web(datos, ahora=None, dao=None, cliente_dao=None, config_dao=None):
     """Crea una reserva pedida por la web: nace 'pendiente' y NO cuenta para la capacidad.
     El cupo es un filtro duro y el tope de reservas por teléfono en 24 h se aplica aquí.
     """
     dao = dao or reserva_dao_default
     cliente_dao = cliente_dao or cliente_dao_default
     config_dao = config_dao or config_dao_default
+    ahora = ahora or ahora_local()
 
     nombre, telefono, correo, fecha, personas = _datos_comunes_validados(datos, config_dao=config_dao)
     hora = validar_hora_en_franjas(fecha, datos.get("hora"), dao=dao, config_dao=config_dao)
+
+    config = obtener_config(config_dao)
+    anticipacion_min = config.get("anticipacion_min_min", 30)
+    franja_min = config.get("franja_min", 30)
+    reservable, motivo_reservable = franja_reservable(
+        fecha, hora, franja_min, ahora, canal="web", anticipacion_min=anticipacion_min
+    )
+    if not reservable:
+        raise ValueError(motivo_reservable)
 
     nota = (datos.get("nota") or "").strip() or None
     if nota and len(nota) > 300:
@@ -249,14 +343,23 @@ def crear_reserva_web(datos, dao=None, cliente_dao=None, config_dao=None):
         raise ValueError("No se pudo registrar la reserva. Verifica los datos e intenta nuevamente.")
 
 
-def crear_reserva_staff(datos, personal_id, forzar=False, dao=None, cliente_dao=None, config_dao=None):
+def crear_reserva_staff(datos, personal_id, forzar=False, ahora=None, dao=None, cliente_dao=None, config_dao=None):
     """Crea una reserva desde el staff: nace 'confirmada'."""
     dao = dao or reserva_dao_default
     cliente_dao = cliente_dao or cliente_dao_default
     config_dao = config_dao or config_dao_default
+    ahora = ahora or ahora_local()
 
     nombre, telefono, correo, fecha, personas = _datos_comunes_validados(datos, exigir_consentimiento=False, config_dao=config_dao)
     hora = validar_hora_en_franjas(fecha, datos.get("hora"), dao=dao, config_dao=config_dao)
+
+    config = obtener_config(config_dao)
+    franja_min = config.get("franja_min", 30)
+    reservable, motivo_reservable = franja_reservable(
+        fecha, hora, franja_min, ahora, canal="staff"
+    )
+    if not reservable:
+        raise ValueError(motivo_reservable)
 
     nota = (datos.get("nota") or "").strip() or None
     if nota and len(nota) > 300:
@@ -356,10 +459,11 @@ def marcar_no_llego(reserva_id, dao=None):
 
 # ---------------------------------------------------------------- cambiar hora
 
-def cambiar_hora(reserva_id, nueva_hora_str, forzar=False, dao=None, config_dao=None):
+def cambiar_hora(reserva_id, nueva_hora_str, forzar=False, ahora=None, dao=None, config_dao=None):
     """Cambia la hora de una reserva CONFIRMADA."""
     dao = dao or reserva_dao_default
     config_dao = config_dao or config_dao_default
+    ahora = ahora or ahora_local()
 
     reserva = dao.buscar_por_id(reserva_id)
     if not reserva:
@@ -373,6 +477,14 @@ def cambiar_hora(reserva_id, nueva_hora_str, forzar=False, dao=None, config_dao=
     nueva_hora = validar_hora_en_franjas(reserva["fecha"], nueva_hora_str, dao=dao, config_dao=config_dao)
     if nueva_hora == reserva["hora"]:
         raise ValueError("La hora elegida es la misma que ya tiene la reserva.")
+
+    config = obtener_config(config_dao)
+    franja_min = config.get("franja_min", 30)
+    reservable, motivo_reservable = franja_reservable(
+        reserva["fecha"], nueva_hora, franja_min, ahora, canal="staff"
+    )
+    if not reservable:
+        raise ValueError(motivo_reservable)
 
     _rechazo_por_reserva_duplicada(reserva["cliente_id"], reserva["fecha"], nueva_hora, dao=dao)
 
@@ -406,16 +518,22 @@ def obtener_reserva_publica(token, dao=None):
     return dao.buscar_por_token(token)
 
 
-def obtener_pizarra(fecha, dao=None, config_dao=None, cliente_dao=None):
-    """Todo lo que la pizarra digital necesita para un día."""
+def obtener_pizarra(fecha, ver_pasadas=False, dao=None, config_dao=None, cliente_dao=None):
+    """Todo lo que la pizarra digital necesita para un día.
+    Para HOY, por defecto solo muestra franjas cuyo fin es posterior a la hora actual
+    y las reservas que aún ocupan mesa (a menos que ver_pasadas=True).
+    """
     dao = dao or reserva_dao_default
     config_dao = config_dao or config_dao_default
     cliente_dao = cliente_dao or cliente_dao_default
 
+    ahora = ahora_local()
+    # Vencimiento perezoso
+    liberar_reservas_vencidas(ahora=ahora, dao=dao)
+
     config = obtener_config(config_dao)
     franjas_sql = carga_dia(fecha, dao=dao)
     tolerancia = timedelta(minutes=config["tolerancia_min"])
-    ahora = ahora_local()
 
     reservas_del_dia = dao.listar_del_dia(fecha)
 
@@ -456,7 +574,7 @@ def obtener_pizarra(fecha, dao=None, config_dao=None, cliente_dao=None):
                 r = dict(r)
                 r["continua"] = inicio_reserva < ini
                 ocupan_esta.append(r)
-        franjas.append({
+        franja_dict = {
             "franja_inicio": f["franja_inicio"],
             "franja_fin": f["franja_fin"],
             "reservas_totales": f["reservas"],
@@ -469,11 +587,22 @@ def obtener_pizarra(fecha, dao=None, config_dao=None, cliente_dao=None):
             "limita": f["limita"],
             "nivel": f["nivel"],
             "ocupan": ocupan_esta,
-        })
+        }
+
+        # Para hoy, si no se pide ver_pasadas, ocultar franjas pasadas que no tengan ocupación activa
+        if fecha_dt == ahora.date() and not ver_pasadas:
+            if fin <= ahora and len(ocupan_esta) == 0:
+                continue
+
+        franjas.append(franja_dict)
+
+    franjas_ocultas = len(franjas_sql) - len(franjas)
 
     return {
         "fecha": fecha,
         "nombre_local": config["nombre_local"],
         "franjas": franjas,
         "pendientes": pendientes,
+        "franjas_ocultas": franjas_ocultas,
+        "ver_pasadas": bool(ver_pasadas),
     }

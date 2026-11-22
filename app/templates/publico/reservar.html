@@ -72,18 +72,26 @@
                     <input type="hidden" name="hora" id="hora_seleccionada"
                            value="{{ request.form.get('hora', '') }}" required>
                     <div class="d-flex flex-wrap gap-2 mb-2" id="horas-container">
+                        {% set total_disponibles = namespace(count=0) %}
                         {% for h in horarios %}
-                            {% if h.semaforo == 'lleno' %}
+                            {% if h.pasada %}
+                                <button type="button" class="btn btn-outline-secondary btn-opcion-hora disabled"
+                                        disabled title="Esta hora ya pasó">
+                                    <i class="bi bi-clock-history me-1"></i> {{ h.hora }} <small class="text-muted">(Ya pasó)</small>
+                                </button>
+                            {% elif h.semaforo == 'lleno' %}
                                 <button type="button" class="btn btn-outline-secondary btn-opcion-hora disabled"
                                         disabled title="Lleno: prueba otra hora">
                                     <i class="bi bi-slash-circle me-1"></i> {{ h.hora }}
                                 </button>
                             {% elif h.semaforo == 'pocas' %}
+                                {% set total_disponibles.count = total_disponibles.count + 1 %}
                                 <button type="button" class="btn btn-warning btn-opcion-hora"
                                         data-hora="{{ h.hora }}" title="Quedan pocas mesas">
                                     <i class="bi bi-exclamation-triangle me-1"></i> {{ h.hora }}
                                 </button>
                             {% else %}
+                                {% set total_disponibles.count = total_disponibles.count + 1 %}
                                 <button type="button" class="btn btn-outline-success btn-opcion-hora"
                                         data-hora="{{ h.hora }}" title="Disponible">
                                     <i class="bi bi-check-circle me-1"></i> {{ h.hora }}
@@ -91,10 +99,16 @@
                             {% endif %}
                         {% endfor %}
                     </div>
+                    {% if total_disponibles.count == 0 %}
+                        <div class="alert alert-info py-2 small mb-2">
+                            <i class="bi bi-info-circle me-1"></i> Hoy ya no hay horarios disponibles; elige otro día.
+                        </div>
+                    {% endif %}
                     <div class="form-text mb-3">
                         <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Disponible</span>
                         <span class="badge bg-warning text-dark">Quedan pocas mesas</span>
                         <span class="badge bg-secondary">Lleno</span>
+                        <span class="badge bg-light text-muted border">Ya pasó</span>
                     </div>
 
                     <div class="mb-3">

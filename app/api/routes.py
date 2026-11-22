@@ -117,6 +117,7 @@ def reservas_dia():
     Ej: GET /api/v1/reservas/dia?fecha=2026-10-20
     """
     fecha = request.args.get("fecha")
+    ver_pasadas = request.args.get("ver_pasadas") in ("1", "true", "True")
     if not fecha:
         fecha = servicio_reservas.hoy().isoformat()
     try:
@@ -125,7 +126,7 @@ def reservas_dia():
         return respuesta_error("PARAMETRO_INVALIDO", "La fecha debe tener el formato YYYY-MM-DD.", 400)
 
     try:
-        pizarra = servicio_reservas.obtener_pizarra(fecha_date)
+        pizarra = servicio_reservas.obtener_pizarra(fecha_date, ver_pasadas=ver_pasadas)
     except ValueError as e:
         return respuesta_error("ERROR_NEGOCIO", str(e), 400)
 
@@ -151,6 +152,8 @@ def reservas_dia():
         "fecha": _iso(pizarra["fecha"]),
         "franjas": franjas,
         "pendientes": [_serializar_reserva(r) for r in pizarra["pendientes"]],
+        "franjas_ocultas": pizarra.get("franjas_ocultas", 0),
+        "ver_pasadas": pizarra.get("ver_pasadas", False),
     })
 
 

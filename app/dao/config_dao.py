@@ -29,6 +29,7 @@ class ConfigDAO:
                 hora_apertura = %s,
                 hora_cierre = %s,
                 dias_max_anticipacion = %s,
+                anticipacion_min_min = %s,
                 porcentaje_reservable = %s,
                 abierto = %s,
                 yape_numero = %s,

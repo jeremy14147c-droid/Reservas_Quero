@@ -8,11 +8,11 @@ INSERT INTO config_local
   (config_id, nombre_local, aforo_personas, total_mesas, personas_por_mesa,
    duracion_1_3_min, duracion_4_7_min, duracion_8_mas_min,
    franja_min, tolerancia_min, umbral_preparacion_min, max_reservas_web_por_telefono, umbral_alerta_pct,
-   hora_apertura, hora_cierre, dias_max_anticipacion, porcentaje_reservable, abierto,
+   hora_apertura, hora_cierre, dias_max_anticipacion, anticipacion_min_min, porcentaje_reservable, abierto,
    yape_numero, yape_titular, mensaje_pago)
 VALUES
   (1, 'Quero Gastrobar', 48, 12, 4, 30, 60, 90, 30, 15, 20, 2, 80,
-   '12:00', '23:00', 3, NULL, TRUE,
+   '12:00', '23:00', 3, 30, NULL, TRUE,
    '996908138', 'Quero Gastrobar', 'Envía tu comprobante de pago al WhatsApp 996908138 indicando tu código de pedido.')
 ON CONFLICT (config_id) DO UPDATE SET
   nombre_local = EXCLUDED.nombre_local,

@@ -68,6 +68,7 @@ CREATE TABLE config_local (
   hora_apertura          TIME NOT NULL,
   hora_cierre            TIME NOT NULL,
   dias_max_anticipacion  INT NOT NULL CHECK (dias_max_anticipacion >= 0),
+  anticipacion_min_min   SMALLINT NOT NULL DEFAULT 30 CHECK (anticipacion_min_min >= 0), -- minutos de anticipación para reservar por la web
   porcentaje_reservable  SMALLINT NULL CHECK (porcentaje_reservable BETWEEN 1 AND 100), -- NULL = 100 %
   abierto                BOOLEAN NOT NULL DEFAULT TRUE,
   yape_numero            VARCHAR(15)  NULL,

@@ -76,5 +76,18 @@ def crear_admin(nombre, correo, password):
     click.secho(f"¡Administrador '{nombre.strip()}' ({correo_limpio}) creado exitosamente!", fg="green")
 
 
+@app.cli.command("liberar-vencidas")
+def liberar_vencidas():
+    """Cierra de forma automática las reservas pendientes o confirmadas vencidas."""
+    from app.servicios import reservas as servicio_reservas
+    resultado = servicio_reservas.liberar_reservas_vencidas()
+    click.secho(
+        f"Reservas liberadas/cerradas: {resultado['total']} "
+        f"({resultado['pendientes_rechazadas']} pendientes vencidas -> rechazadas, "
+        f"{resultado['confirmadas_no_llego']} confirmadas vencidas -> no_llego).",
+        fg="green"
+    )
+
+
 if __name__ == "__main__":
     app.cli()

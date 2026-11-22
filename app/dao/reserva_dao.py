@@ -1,5 +1,5 @@
 """DAO para la entidad Reserva (tabla reserva y funciones SQL fn_hay_cupo, fn_carga_dia, fn_duracion_estadia)."""
-from app.db import consultar_todos, consultar_uno, ejecutar_retornando
+from app.db import consultar_todos, consultar_uno, ejecutar_retornando, ejecutar_retornando_todos
 
 
 class ReservaDAO:
@@ -179,3 +179,35 @@ class ReservaDAO:
             """,
             (nueva_hora, hora_anterior, excede_cupo, reserva_id)
         )
+
+    def liberar_pendientes_vencidas(self, ahora):
+        """Cierra reservas pendientes cuya hora ya pasó a 'rechazada'."""
+        filas = ejecutar_retornando_todos(
+            """
+            UPDATE reserva
+            SET estado = 'rechazada',
+                motivo = 'Vencida: nadie la atendió a tiempo',
+                actualizado_en = %s
+            WHERE estado = 'pendiente'
+              AND (fecha < %s OR (fecha = %s AND hora <= %s))
+            RETURNING reserva_id
+            """,
+            (ahora, ahora.date(), ahora.date(), ahora.time())
+        )
+        return len(filas)
+
+    def liberar_confirmadas_vencidas(self, ahora):
+        """Cierra reservas confirmadas cuya ocupación de mesa ya terminó a 'no_llego'."""
+        filas = ejecutar_retornando_todos(
+            """
+            UPDATE reserva r
+            SET estado = 'no_llego',
+                motivo = 'Automático: no se registró la llegada',
+                actualizado_en = %s
+            WHERE r.estado = 'confirmada'
+              AND ((r.fecha + r.hora) + make_interval(mins => fn_duracion_estadia(r.cantidad_personas))) <= %s
+            RETURNING r.reserva_id
+            """,
+            (ahora, ahora)
+        )
+        return len(filas)

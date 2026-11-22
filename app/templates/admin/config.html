@@ -156,6 +156,12 @@
                                    value="{{ config.dias_max_anticipacion }}" required>
                             <div class="form-text">Cuántos días hacia adelante puede reservar un cliente.</div>
                         </div>
+                        <div class="col-md-3">
+                            <label for="anticipacion_min_min" class="form-label fw-semibold">Anticipación Mín. Web (min)</label>
+                            <input type="number" min="0" class="form-control" id="anticipacion_min_min" name="anticipacion_min_min"
+                                   value="{{ config.anticipacion_min_min }}" required>
+                            <div class="form-text">Minutos mínimos de anticipación para reservar por la web.</div>
+                        </div>
                     </div>
 
                     <!-- Bloque 5: Datos de Cobro Yape / Plin -->

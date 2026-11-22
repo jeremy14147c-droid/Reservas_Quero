@@ -59,3 +59,14 @@ def ejecutar_retornando(sql, params=None, commit=True):
     if commit:
         db.commit()
     return resultado
+
+
+def ejecutar_retornando_todos(sql, params=None, commit=True):
+    """Ejecuta una sentencia con RETURNING y devuelve todas las filas afectadas."""
+    db = obtener_db()
+    with db.cursor() as cur:
+        cur.execute(sql, params or ())
+        resultado = cur.fetchall()
+    if commit:
+        db.commit()
+    return resultado
