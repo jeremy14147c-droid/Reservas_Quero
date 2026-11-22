@@ -5,7 +5,7 @@ cambio de hora pasada la tolerancia y reserva duplicada con mensaje claro.
 """
 import secrets
 import pytest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.db import consultar_uno, ejecutar, ejecutar_retornando
 from app.servicios import reservas as servicio_reservas
@@ -42,8 +42,8 @@ def _insertar_reserva(cliente_id, fecha, hora, personas=2, estado='confirmada',
 
 
 def _fecha_valida():
-    """Fecha dentro del rango permitido (hoy cumple la anticipación)."""
-    return servicio_reservas.hoy()
+    """Fecha dentro del rango permitido (mañana cumple la anticipación y no tiene horas pasadas)."""
+    return servicio_reservas.hoy() + timedelta(days=1)
 
 
 def _codigos_franja(fecha):
