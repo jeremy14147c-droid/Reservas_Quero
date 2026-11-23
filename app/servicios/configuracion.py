@@ -1,6 +1,7 @@
 """Servicio para consultar y actualizar la configuración operativa del local (config_local)."""
 from datetime import time
 from app.dao.config_dao import ConfigDAO
+from app.servicios.marca import validar_url_segura, validar_whatsapp
 
 # Instancia por defecto del DAO
 config_dao_default = ConfigDAO()
@@ -139,6 +140,19 @@ def actualizar_config_local(datos, dao=None):
     yape_titular = (datos.get("yape_titular") or "").strip() or None
     mensaje_pago = (datos.get("mensaje_pago") or "").strip() or None
 
+    # Contacto y marca (Fase 3.4). Las URL solo aceptan https:// y el WhatsApp
+    # reusa la regla del teléfono del cliente (9 dígitos que empiezan en 9).
+    whatsapp_numero = validar_whatsapp(datos.get("whatsapp_numero"))
+    direccion = (datos.get("direccion") or "").strip() or None
+    if direccion and len(direccion) > 150:
+        raise ValueError("La dirección no puede superar los 150 caracteres.")
+    maps_url = validar_url_segura(datos.get("maps_url"), "enlace del mapa")
+    instagram_url = validar_url_segura(datos.get("instagram_url"), "enlace de Instagram")
+    facebook_url = validar_url_segura(datos.get("facebook_url"), "enlace de Facebook")
+    eslogan = (datos.get("eslogan") or "").strip() or None
+    if eslogan and len(eslogan) > 150:
+        raise ValueError("El eslogan no puede superar los 150 caracteres.")
+
     params = (
         nombre_local,
         aforo,
@@ -158,6 +172,12 @@ def actualizar_config_local(datos, dao=None):
         anticipacion_min,
         porc_reservable_val,
         abierto,
+        whatsapp_numero,
+        direccion,
+        maps_url,
+        instagram_url,
+        facebook_url,
+        eslogan,
         yape_numero,
         yape_titular,
         mensaje_pago

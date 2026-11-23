@@ -32,6 +32,12 @@ def config():
             "dias_max_anticipacion": request.form.get("dias_max_anticipacion"),
             "porcentaje_reservable": request.form.get("porcentaje_reservable"),
             "abierto": "abierto" in request.form,
+            "whatsapp_numero": request.form.get("whatsapp_numero"),
+            "direccion": request.form.get("direccion"),
+            "maps_url": request.form.get("maps_url"),
+            "instagram_url": request.form.get("instagram_url"),
+            "facebook_url": request.form.get("facebook_url"),
+            "eslogan": request.form.get("eslogan"),
             "yape_numero": request.form.get("yape_numero"),
             "yape_titular": request.form.get("yape_titular"),
             "mensaje_pago": request.form.get("mensaje_pago")

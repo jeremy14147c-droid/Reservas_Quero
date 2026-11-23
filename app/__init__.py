@@ -1,4 +1,6 @@
 """Fábrica de la aplicación Flask (Application Factory)."""
+import os
+
 from flask import Flask, render_template, request
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -7,6 +9,8 @@ from app.config import Config, validar_secret_key
 from app.db import cerrar_db
 from app.auth.usuario import cargar_usuario, obtener_usuario_actual
 from app.api.helpers import respuesta_error
+from app.servicios import configuracion as servicio_configuracion
+from app.servicios.marca import construir_marca
 from app.utils import formato_hora_12h, formato_fecha_ddmm
 
 # Extensiones globales
@@ -43,8 +47,16 @@ def create_app(config_class=Config):
     # Inyectar variables globales a todas las plantillas Jinja2
     @app.context_processor
     def inyectar_contexto():
+        # Datos de contacto y marca para las páginas públicas (Fase 3.4).
+        # Si la base falla, la web pública se muestra con los textos por defecto.
+        try:
+            config_local = servicio_configuracion.obtener_config_local()
+        except Exception:
+            config_local = None
         return {
             "usuario_actual": obtener_usuario_actual(),
+            "marca": construir_marca(config_local),
+            "logo_existe": os.path.exists(os.path.join(app.static_folder, "img", "logo.png")),
             "utils_hora12": formato_hora_12h,
             "utils_fecha": formato_fecha_ddmm
         }

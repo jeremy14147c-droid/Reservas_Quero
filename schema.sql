@@ -71,6 +71,14 @@ CREATE TABLE config_local (
   anticipacion_min_min   SMALLINT NOT NULL DEFAULT 30 CHECK (anticipacion_min_min >= 0), -- minutos de anticipación para reservar por la web
   porcentaje_reservable  SMALLINT NULL CHECK (porcentaje_reservable BETWEEN 1 AND 100), -- NULL = 100 %
   abierto                BOOLEAN NOT NULL DEFAULT TRUE,
+  -- Contacto y marca del local (Fase 3.4). NULL = dato pendiente: la web
+  -- muestra "Pendiente: ..." en lugar de inventarlo.
+  whatsapp_numero        VARCHAR(15)  NULL,   -- 9 dígitos que empiezan en 9 (misma regla que el cliente)
+  direccion              VARCHAR(150) NULL,
+  maps_url               VARCHAR(300) NULL,   -- debe empezar por https://
+  instagram_url          VARCHAR(200) NULL,   -- debe empezar por https://
+  facebook_url           VARCHAR(200) NULL,   -- debe empezar por https://
+  eslogan                VARCHAR(150) NULL,
   yape_numero            VARCHAR(15)  NULL,
   yape_titular           VARCHAR(100) NULL,
   mensaje_pago           VARCHAR(300) NULL,

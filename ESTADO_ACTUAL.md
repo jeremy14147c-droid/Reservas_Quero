@@ -3,8 +3,8 @@
 Archivo para el equipo y el agente. Si algo contradice a otro documento del repo, manda este archivo y luego `AGENTS.md`.
 
 ## 1. Dónde estamos
-- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), **Fases S1 + S2 de Seguridad (Semana 14)** (sesión revocable, fuerza bruta, redirect seguro, cabeceras, UUID), **Fase 3.R (Capa DAO y desacoplamiento)** (100% del SQL en `app/dao/`), y **Fase 3.3 (Horas pasadas y vencimiento automático)**: regla pura `franja_reservable`, anticipación mínima editable en Configuración, horas pasadas deshabilitadas en `/reservar` ("Ya pasó"), rechazo en servidor por web/staff/cambio de hora, filtro de horas pasadas en pizarra/API con interruptor "Ver horas anteriores", y vencimiento automático perezoso/idempotente de reservas (`manage.py liberar-vencidas`). **75 pruebas en verde**.
-- Siguiente paso: **Fase 3.4** (Identidad visual del cliente). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
+- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), **Fases S1 + S2 de Seguridad (Semana 14)** (sesión revocable, fuerza bruta, redirect seguro, cabeceras, UUID), **Fase 3.R (Capa DAO y desacoplamiento)** (100% del SQL en `app/dao/`), **Fase 3.3 (Horas pasadas y vencimiento automático)** y **Fase 3.4 (Identidad visual del cliente)**: `base_cliente.html` + `cliente.css`, accesos directos, pie con dirección/horario/mapa/redes, botón flotante de WhatsApp, inicio tipo restaurante y sección "Contacto y marca" en Administración con validación https/WhatsApp. **101 pruebas en verde**.
+- Siguiente paso: **Fase 3.5** (Carta y pedido en celular). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
 
 ## 2. Problemas detectados (verificados)
 1. [RESUELTO en 3.0] `.venv/` ya no está versionado en Git (se eliminó del índice con `git rm -r --cached .venv`). `.env` no está en el historial (revisado).
@@ -22,6 +22,8 @@ Archivo para el equipo y el agente. Si algo contradice a otro documento del repo
 - El atajo "local directo a entregado" quedó descartado por ahora.
 - WhatsApp: se usan enlaces `wa.me` (costo cero). La API oficial cuesta por mensaje (ver `WHATSAPP_COSTOS.md`) y queda para el proyecto final.
 - El cliente ve una interfaz de restaurante; el staff, una sobria. Las páginas públicas nunca muestran el menú de staff.
+- Datos reales del local (Fase 3.4): WhatsApp 996908138, Av. Inca Garcilaso de la Vega 54 (Villa María del Triunfo), Google Maps `https://maps.app.goo.gl/rATMHp75PEziVzCQ8`, Facebook `GastrobarPiqueosTragos` e Instagram `quero_gastrobar`. Paleta tomada del logo: rojo `#c8382b`, naranja `#e08a2e`, amarillo `#f2b233`, crema `#faf7f2`, tinta `#1e1b18`.
+- Eslogan provisional (hasta que la dueña defina el definitivo): "El sabor del mar y lo criollo, en un solo lugar." Es editable en Administración > Configuración.
 
 ## 4. Orden de trabajo
 | Fase | Qué | Depende de | Estado |
@@ -31,9 +33,8 @@ Archivo para el equipo y el agente. Si algo contradice a otro documento del repo
 | S1-S2 | Seguridad OWASP (login, sesión revocable, cabeceras, UUID) | D | Completado (62 tests en verde) |
 | 3.R | Capa DAO real y arranque del TDD | 3.0 | Completado (65 tests en verde) |
 | 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R | Completado (75 tests en verde) |
-| 3.4 | Identidad visual del cliente | 3.3 | Siguiente |
-| 3.4 | Identidad visual del cliente | 3.3 | Pendiente |
-| 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 | Pendiente |
+| 3.4 | Identidad visual del cliente | 3.3 | Completado (101 tests en verde) |
+| 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 | Siguiente |
 | 3.6 | Cocina: imprimir y recojo primero | 3.5 | Pendiente |
 | 3.7 | Pago con comprobante | 3.6 | Pendiente |
 | 3.8 | WhatsApp sin costo (mensajes y botones) | 3.7 | Pendiente |
@@ -49,11 +50,13 @@ La numeración de `FASE_3_1_CAMBIOS.md` queda **reemplazada** por esta.
 5. Probar en el navegador y reportar. Los documentos de defensa solo afirman lo que el código y `git log` demuestran.
 
 ## 6. Pendiente de decidir (Jeremy)
-- Datos del local: WhatsApp, enlace de Google Maps, dirección, redes, logo y colores (la 3.4 no los inventa).
+- Guardar el logo real (el que envió la dueña) como `app/static/img/logo.png`. Mientras no exista, la web muestra el wordmark "QUERO GASTROBAR" con los colores de la marca.
+- Elegir la tipografía definitiva entre las 3 opciones de la vista previa (hoy aplicada: Fraunces + Inter; se cambia en 2 líneas de `base_cliente.html` y 2 variables de `cliente.css`).
 - Si el margen mínimo de anticipación para reservar por la web es 30 min (valor por defecto editable) o 0.
 - Confirmar con la dueña el vencimiento automático (pendientes vencidas → rechazadas; confirmadas sin "Llegó" → no llegó automático): puede inflar las estadísticas de "no llegó" si el staff olvida marcar la llegada.
-- Dónde se publica (hosting gratuito o de pago).
+- Dónde se publica definitivamente (hoy: Render + Neon) y si se usa un dominio propio.
 - Si hay fotos reales de los platos (decide si se hace la 3.9).
+- Decidir qué hacer con el prototipo Node/Express antiguo de la raíz (`server.js`, `package.json`, `db.js`, etc.): moverlo a `_prototipo_antiguo/` o borrarlo antes de la sustentación.
 
 ## 7. No hacer
 Usar la API de WhatsApp, agregar ORM o frameworks de JavaScript, volver a escribir SQL dentro de servicios o rutas, tocar fases cerradas sin pedirlo, ni inventar datos del local.

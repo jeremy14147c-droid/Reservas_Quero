@@ -32,6 +32,12 @@ class ConfigDAO:
                 anticipacion_min_min = %s,
                 porcentaje_reservable = %s,
                 abierto = %s,
+                whatsapp_numero = %s,
+                direccion = %s,
+                maps_url = %s,
+                instagram_url = %s,
+                facebook_url = %s,
+                eslogan = %s,
                 yape_numero = %s,
                 yape_titular = %s,
                 mensaje_pago = %s

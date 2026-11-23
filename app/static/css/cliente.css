@@ -1,0 +1,488 @@
+/* =====================================================================
+   Quero Gastrobar · Estilos del CLIENTE (Fase 3.4)
+   Solo para las páginas públicas. El panel del staff usa css/style.css.
+   Toda la marca se cambia desde estas variables.
+   ===================================================================== */
+:root {
+    --quero-rojo: #c8382b;
+    --quero-rojo-oscuro: #9f2a20;
+    --quero-naranja: #e08a2e;
+    --quero-amarillo: #f2b233;
+    --quero-crema: #faf7f2;
+    --quero-crema-2: #f2ece1;
+    --quero-tinta: #1e1b18;
+    --quero-gris: #6b6259;
+    --quero-blanco: #ffffff;
+
+    --fuente-titulos: "Fraunces", Georgia, "Times New Roman", serif;
+    --fuente-texto: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    --radio: 1rem;
+    --radio-grande: 1.5rem;
+    --sombra: 0 10px 30px rgba(30, 27, 24, 0.08);
+    --sombra-fuerte: 0 16px 40px rgba(30, 27, 24, 0.16);
+}
+
+/* ---------- Base ---------- */
+body.pagina-cliente {
+    background-color: var(--quero-crema);
+    color: var(--quero-tinta);
+    font-family: var(--fuente-texto);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.pagina-cliente h1,
+.pagina-cliente h2,
+.pagina-cliente h3,
+.pagina-cliente .marca-titulo {
+    font-family: var(--fuente-titulos);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.pagina-cliente main {
+    flex: 1 0 auto;
+}
+
+.pagina-cliente a {
+    text-decoration: none;
+}
+
+.pagina-cliente :focus-visible {
+    outline: 3px solid var(--quero-naranja);
+    outline-offset: 2px;
+    border-radius: 0.35rem;
+}
+
+/* ---------- Barra de sesión de staff (discreta) ---------- */
+.franja-staff {
+    background: #fdf0d5;
+    border-bottom: 1px solid #f0d9a8;
+    color: #6b4e00;
+    font-size: 0.82rem;
+    padding: 0.4rem 0;
+}
+
+.franja-staff a {
+    color: #6b4e00;
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+/* ---------- Encabezado ---------- */
+.cabecera-cliente {
+    background: rgba(250, 247, 242, 0.96);
+    border-bottom: 1px solid var(--quero-crema-2);
+    backdrop-filter: blur(8px);
+}
+
+.logo-cliente {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: var(--quero-tinta);
+}
+
+.logo-cliente img {
+    height: 54px;
+    width: auto;
+    display: block;
+}
+
+/* Wordmark de texto (respaldo cuando todavía no hay logo.png) */
+.wordmark {
+    display: inline-flex;
+    flex-direction: column;
+    line-height: 1;
+}
+
+.wordmark .wordmark-quero {
+    font-family: var(--fuente-titulos);
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    background: linear-gradient(100deg, var(--quero-rojo) 0%, var(--quero-naranja) 55%, var(--quero-amarillo) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.wordmark .wordmark-gastrobar {
+    font-family: var(--fuente-texto);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.55em;
+    color: var(--quero-rojo);
+    margin-top: 0.15rem;
+}
+
+/* ---------- Accesos directos ---------- */
+.accesos-cliente {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.65rem 0;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+
+.acceso {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    white-space: nowrap;
+    padding: 0.6rem 0.95rem;
+    border-radius: 999px;
+    border: 1px solid var(--quero-crema-2);
+    background: var(--quero-blanco);
+    color: var(--quero-tinta);
+    font-weight: 600;
+    font-size: 0.92rem;
+    box-shadow: 0 2px 8px rgba(30, 27, 24, 0.05);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.acceso:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(30, 27, 24, 0.12);
+    color: var(--quero-tinta);
+}
+
+.acceso i {
+    color: var(--quero-rojo);
+    font-size: 1.1rem;
+}
+
+.acceso--principal {
+    background: var(--quero-rojo);
+    border-color: var(--quero-rojo);
+    color: var(--quero-blanco);
+}
+
+.acceso--principal i {
+    color: var(--quero-amarillo);
+}
+
+.acceso--principal:hover {
+    background: var(--quero-rojo-oscuro);
+    color: var(--quero-blanco);
+}
+
+/* ---------- Hero del inicio ---------- */
+.hero-cliente {
+    position: relative;
+    padding: 3rem 0 2.5rem;
+    overflow: hidden;
+}
+
+.hero-cliente::before {
+    content: "";
+    position: absolute;
+    inset: -30% -10% auto auto;
+    width: 520px;
+    height: 520px;
+    background: radial-gradient(circle at 30% 30%, rgba(242, 178, 51, 0.35), rgba(224, 138, 46, 0.18) 45%, transparent 70%);
+    border-radius: 50%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.hero-cliente > * {
+    position: relative;
+    z-index: 1;
+}
+
+.hero-etiqueta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--quero-crema-2);
+    color: var(--quero-rojo-oscuro);
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.hero-titulo {
+    font-size: clamp(2.6rem, 7vw, 4.5rem);
+    line-height: 1.02;
+    margin: 0.9rem 0 0.6rem;
+}
+
+.hero-titulo .resaltado {
+    color: var(--quero-rojo);
+}
+
+.hero-eslogan {
+    font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+    color: var(--quero-tinta);
+    font-weight: 600;
+    max-width: 34rem;
+}
+
+.hero-descripcion {
+    color: var(--quero-gris);
+    max-width: 38rem;
+    margin-top: 0.6rem;
+}
+
+.hero-botones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1.5rem;
+}
+
+.boton-cliente {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.9rem 1.4rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 1rem;
+    border: 0;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: var(--sombra);
+}
+
+.boton-cliente:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--sombra-fuerte);
+}
+
+.boton-cliente--rojo {
+    background: var(--quero-rojo);
+    color: var(--quero-blanco);
+}
+
+.boton-cliente--rojo:hover {
+    background: var(--quero-rojo-oscuro);
+    color: var(--quero-blanco);
+}
+
+.boton-cliente--contorno {
+    background: var(--quero-blanco);
+    color: var(--quero-tinta);
+    border: 2px solid var(--quero-tinta);
+}
+
+.boton-cliente--contorno:hover {
+    background: var(--quero-tinta);
+    color: var(--quero-crema);
+}
+
+/* ---------- Tarjetas del inicio ---------- */
+.tarjeta-cliente {
+    background: var(--quero-blanco);
+    border: 1px solid var(--quero-crema-2);
+    border-radius: var(--radio-grande);
+    box-shadow: var(--sombra);
+    padding: 1.4rem;
+    height: 100%;
+}
+
+.tarjeta-cliente .icono-cliente {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(140deg, rgba(200, 56, 43, 0.12), rgba(242, 178, 51, 0.22));
+    color: var(--quero-rojo);
+    font-size: 1.35rem;
+    margin-bottom: 0.8rem;
+}
+
+.tarjeta-cliente h3 {
+    font-size: 1.15rem;
+    margin-bottom: 0.35rem;
+}
+
+.tarjeta-cliente p {
+    color: var(--quero-gris);
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+.pendiente {
+    display: inline-block;
+    background: #fff3cd;
+    color: #7a5b00;
+    border: 1px dashed #e0b700;
+    border-radius: 0.4rem;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* ---------- Contenido heredado (carta, reservar, pedir, seguimiento) ---------- */
+.pagina-cliente .card {
+    border-radius: var(--radio);
+    border-color: var(--quero-crema-2);
+}
+
+.pagina-cliente .card-header.bg-dark {
+    background: var(--quero-tinta) !important;
+}
+
+.pagina-cliente .btn-warning {
+    background: var(--quero-rojo);
+    border-color: var(--quero-rojo);
+    color: var(--quero-blanco);
+}
+
+.pagina-cliente .btn-warning:hover,
+.pagina-cliente .btn-warning:focus {
+    background: var(--quero-rojo-oscuro);
+    border-color: var(--quero-rojo-oscuro);
+    color: var(--quero-blanco);
+}
+
+.pagina-cliente .text-warning {
+    color: var(--quero-amarillo) !important;
+}
+
+/* ---------- Pie de página ---------- */
+.pie-cliente {
+    background: var(--quero-tinta);
+    color: #e9e2d7;
+    margin-top: 3rem;
+    padding: 2.6rem 0 1.4rem;
+}
+
+.pie-cliente h4 {
+    font-family: var(--fuente-titulos);
+    font-size: 1.2rem;
+    color: var(--quero-blanco);
+    margin-bottom: 0.8rem;
+}
+
+.pie-cliente a {
+    color: #e9e2d7;
+}
+
+.pie-cliente a:hover {
+    color: var(--quero-amarillo);
+}
+
+.pie-cliente .pie-titulo {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--quero-amarillo);
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+}
+
+.pie-cliente .pie-lista {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.92rem;
+    color: #cfc6b9;
+}
+
+.pie-cliente .pie-lista li {
+    margin-bottom: 0.45rem;
+}
+
+.pie-cliente .redes {
+    display: flex;
+    gap: 0.6rem;
+}
+
+.pie-cliente .redes a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 1.1rem;
+}
+
+.pie-cliente .redes a:hover {
+    background: var(--quero-rojo);
+    color: var(--quero-blanco);
+}
+
+.pie-legal {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    margin-top: 1.6rem;
+    padding-top: 1rem;
+    font-size: 0.8rem;
+    color: #a89e91;
+}
+
+/* ---------- Botón flotante de WhatsApp ---------- */
+.boton-whatsapp-flotante {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 1050;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #25d366;
+    color: var(--quero-blanco);
+    font-size: 1.7rem;
+    box-shadow: 0 10px 24px rgba(37, 211, 102, 0.45);
+    transition: transform 0.15s ease;
+}
+
+.boton-whatsapp-flotante:hover {
+    transform: scale(1.06);
+    color: var(--quero-blanco);
+}
+
+/* ---------- Banner sin conexión ---------- */
+.banner-sin-conexion-cliente {
+    background: #8b1a11;
+    color: var(--quero-blanco);
+    text-align: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* ---------- Escritorio ---------- */
+@media (min-width: 992px) {
+    .accesos-cliente {
+        justify-content: flex-end;
+        overflow: visible;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .logo-cliente img {
+        height: 44px;
+    }
+
+    .wordmark .wordmark-quero {
+        font-size: 1.7rem;
+    }
+
+    .hero-cliente {
+        padding-top: 2rem;
+    }
+
+    .boton-cliente {
+        width: 100%;
+    }
+
+    .pie-cliente {
+        padding-bottom: 4.5rem;
+    }
+}

@@ -1,5 +1,5 @@
 > ✅ **ARQUITECTURA COMPLETA VERIFICADA (Fase 3.R):**
-> El proyecto implementa MVC + Servicios + Capa DAO por entidad en `app/dao/` (`ConfigDAO`, `ClienteDAO`, `PersonalDAO`, `CartaDAO`, `ReservaDAO`, `PedidoDAO`), pruebas unitarias sin base de datos en `tests/unidad/` con inversión de dependencias y 75 pruebas automatizadas. El historial en `git log --oneline` demuestra el ciclo TDD con commits `test:` antes de `feat:` / `refactor:`.
+> El proyecto implementa MVC + Servicios + Capa DAO por entidad en `app/dao/` (`ConfigDAO`, `ClienteDAO`, `PersonalDAO`, `CartaDAO`, `ReservaDAO`, `PedidoDAO`), pruebas unitarias sin base de datos en `tests/unidad/` con inversión de dependencias y 101 pruebas automatizadas. El historial en `git log --oneline` demuestra el ciclo TDD con commits `test:` antes de `feat:` / `refactor:`.
 
 # Defensa de sustentación — Quero Gastrobar (mapeo a la rúbrica)
 
@@ -13,7 +13,7 @@
 |---|---|---|
 | Commits | Pequeños y descriptivos, en ramas por fase con TDD (`test:` antes de `feat:`) | `git log --oneline` |
 | Ramas | `main` (producción) + ramas por fase (`fase-s1`, `fase-3-r`, etc.) | `git branch` |
-| Pruebas automatizadas | **75 funciones de test** en 13 archivos (`tests/test_*.py` y `tests/unidad/`) | `pytest -q` |
+| Pruebas automatizadas | **101 funciones de test** en 15 archivos (`tests/test_*.py` y `tests/unidad/`) | `pytest -q` |
 | Lógica de negocio | Servicios en `app/servicios/` (100% desacoplados de Flask y sin SQL directo) | `app/servicios/*.py` |
 | Capa de acceso a datos (DAO) | Una clase por entidad en `app/dao/` con todo el SQL parametrizado | `app/dao/*.py` |
 | Capa de datos (SQL) | `schema.sql` con 10 tablas, **3 funciones SQL** (cupo, carga, duración) y **2 vistas** | `schema.sql` |
@@ -30,7 +30,7 @@ el **Modelo** es PostgreSQL con funciones SQL (`schema.sql`), el **Controlador**
 blueprints de rutas, y las **Vistas** son plantillas Jinja2. La lógica de negocio vive en una
 capa de servicios separada, y el acceso a datos es una capa DAO propia sobre psycopg 3 con SQL
 parametrizado — sin ORM, para que el diseño de la base de datos mande. Desarrollamos con la
-disciplina de TDD: cada fase trae su archivo de pruebas y hoy hay 52 pruebas automatizadas que
+disciplina de TDD: cada fase trae su archivo de pruebas y hoy hay 101 pruebas automatizadas que
 corren en 19 segundos."
 
 ### Tabla de mapeo (muéstrala)
@@ -42,7 +42,7 @@ corren en 19 segundos."
 | **Controlador (C)** | Blueprints por módulo: `publico`, `reservas`, `pedidos`, `carta`, `admin`, `auth`, `api` (delgados, sin SQL) | `app/*/routes.py`, `app/__init__.py` |
 | **DAO / capa de acceso a datos** | Clases DAO en `app/dao/` (`ConfigDAO`, `ClienteDAO`, `PersonalDAO`, `CartaDAO`, `ReservaDAO`, `PedidoDAO`). Consultas SIEMPRE parametrizadas (%s) sobre `app/db.py` — anti SQL-Injection. Cero SQL en rutas ni servicios. | `app/dao/*.py` |
 | **Capa de servicios** | Toda la lógica de negocio; recibe el DAO inyectable por parámetro; las rutas solo llaman a servicios y nunca contienen reglas ni SQL | `app/servicios/*.py` |
-| **TDD** | Suite completa de 75 pruebas (incluyendo pruebas unitarias sin base de datos en `tests/unidad/`). Ciclos de commits `test:` antes de `feat:` / `refactor:` | `tests/` |
+| **TDD** | Suite completa de 101 pruebas (incluyendo pruebas unitarias sin base de datos en `tests/unidad/`). Ciclos de commits `test:` antes de `feat:` / `refactor:` | `tests/` |
 
 ### Cómo "defender SOLID en Python" (el punto clave)
 
@@ -109,8 +109,8 @@ Recursos del lenguaje INTELIGENTEMENTE elegidos (no alardes gratuitos). Cada uno
    `@app.context_processor`): control de acceso declarativo en ~1 línea por ruta; el mecanismo
    de composición propio de Python. *Evidencia: `app/auth/decoradores.py` + cualquier `routes.py`.*
 2. **App factory + Blueprints** (`create_app()`): una función que arma la app con distintas
-   configuraciones (producción vs `TestConfig` para las 52 pruebas). Es la forma idiomática de
-   Flask y la razón por la que correr 52 pruebas no toca los datos reales del local.
+   configuraciones (producción vs `TestConfig` para las 101 pruebas). Es la forma idiomática de
+   Flask y la razón por la que correr 101 pruebas no toca los datos reales del local.
 3. **Manejo de excepciones como contrato de negocio**: 123 `raise ValueError("mensaje al usuario")`
    espejo de las rutas; `try/except/finally` para limpieza de recursos (los archivos de prueba
    restauran la base con `finally` incluso si algo falla).
@@ -198,7 +198,7 @@ oficial, su número de Yape real y su horario real — todo cargado en `seed.sql
 1. **Flujo de extremo a extremo demostrable**: QR → carta → reserva o pedir → el staff recibe
    (solicitudes pendientes + insignia "ya pidió hace menos de 24 h") → cocina → listo → cobrado
    (el pago se confirma SIEMPRE mirando el Yape/Plin real, nunca la captura del cliente) → entregado → ticket.
-2. **52 pruebas en verde** en la sesión completa (`pytest -q` corre en ~19 s).
+2. **101 pruebas en verde** en la sesión completa (`pytest -q` corre en ~30 s).
 3. **Datos = los del local**: aforo, mesas, duraciones, umbrales editables por la dueña en
    Configuración (principio "cambiar lo mínimo los procesos del local": la dueña sigue usando
    su Yape, su WhatsApp y una tiquetera; el sistema se ajustó a eso).
@@ -227,7 +227,7 @@ Estructura de exposición (8 min si te dejan, 5 min con cronólogo estricto):
 3. **(2 min) Arquitectura** — apoyado en AGENTS.md sección 4 y la tabla de Mapeo del Criterio 1.
   Mostrar `schema.sql` un minuto: "las reglas de capacidad viven en la base de datos".
 4. **(2 min) Demo guiada** — el recorrido del Criterio 4 con datos pre-cargados.
-5. **(1 min) Calidad** — `pytest` en vivo (52 verde en 19 s) + `git log --oneline`.
+5. **(1 min) Calidad** — `pytest` en vivo (101 verde en ~30 s) + `git log --oneline`.
 6. **(1 min) Cierre** — lo aprendido + qué haría con 1 semana más (notificaciones por correo,
   recepción de reservas por WhatsApp, impresión automática en la tiquetera — ya especificado en el doc).
 
@@ -239,7 +239,7 @@ Estructura de exposición (8 min si te dejan, 5 min con cronólogo estricto):
   (usando la tabla de mapeo del Criterio 1).
 - Si preguntan por "clases": devuelve a las 2 clases REALES que existen (`Config`, `CupoNoDisponible`)
   y al decorador de roles. Eso demuestra conocer Python, no recitar UML.
-- Termina SIEMPRE con: *"el sistema está en producción local con datos reales del cliente y 52
+- Termina SIEMPRE con: *"el sistema está en producción local con datos reales del cliente y 101
   pruebas en verde"* — es la oración que resume Criterio 4 y 5 a la vez.
 
 ### Preguntas trampa ya previstas (estudia estas cinco)

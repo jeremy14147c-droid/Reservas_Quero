@@ -164,9 +164,52 @@
                         </div>
                     </div>
 
-                    <!-- Bloque 5: Datos de Cobro Yape / Plin -->
+                    <!-- Bloque 5: Contacto y marca (Fase 3.4) -->
                     <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
-                        <i class="bi bi-qr-code me-2 text-success"></i>5. Datos de Pago Yape / Plin
+                        <i class="bi bi-shop me-2 text-warning"></i>5. Contacto y marca
+                    </h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="whatsapp_numero" class="form-label fw-semibold">WhatsApp del local</label>
+                            <input type="tel" class="form-control" id="whatsapp_numero" name="whatsapp_numero"
+                                   inputmode="numeric" maxlength="15"
+                                   value="{{ config.whatsapp_numero or '' }}" placeholder="9 dígitos que empiecen en 9">
+                            <div class="form-text">Se usa en el botón flotante y en "Escríbenos". Vacío = se oculta el botón.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eslogan" class="form-label fw-semibold">Eslogan</label>
+                            <input type="text" class="form-control" id="eslogan" name="eslogan" maxlength="150"
+                                   value="{{ config.eslogan or '' }}" placeholder="Una frase corta que presente tu local">
+                            <div class="form-text">Aparece debajo del nombre en la página de inicio.</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="direccion" class="form-label fw-semibold">Dirección</label>
+                            <input type="text" class="form-control" id="direccion" name="direccion" maxlength="150"
+                                   value="{{ config.direccion or '' }}" placeholder="Av. ... , distrito">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="maps_url" class="form-label fw-semibold">Enlace de Google Maps</label>
+                            <input type="url" class="form-control" id="maps_url" name="maps_url" maxlength="300"
+                                   value="{{ config.maps_url or '' }}" placeholder="https://maps.app.goo.gl/...">
+                            <div class="form-text">Debe empezar por https://</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="instagram_url" class="form-label fw-semibold">Instagram</label>
+                            <input type="url" class="form-control" id="instagram_url" name="instagram_url" maxlength="200"
+                                   value="{{ config.instagram_url or '' }}" placeholder="https://www.instagram.com/...">
+                            <div class="form-text">Debe empezar por https://</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="facebook_url" class="form-label fw-semibold">Facebook</label>
+                            <input type="url" class="form-control" id="facebook_url" name="facebook_url" maxlength="200"
+                                   value="{{ config.facebook_url or '' }}" placeholder="https://www.facebook.com/...">
+                            <div class="form-text">Debe empezar por https://</div>
+                        </div>
+                    </div>
+
+                    <!-- Bloque 6: Datos de Cobro Yape / Plin -->
+                    <h5 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="bi bi-qr-code me-2 text-success"></i>6. Datos de Pago Yape / Plin
                     </h5>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">

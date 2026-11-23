@@ -9,13 +9,23 @@ INSERT INTO config_local
    duracion_1_3_min, duracion_4_7_min, duracion_8_mas_min,
    franja_min, tolerancia_min, umbral_preparacion_min, max_reservas_web_por_telefono, umbral_alerta_pct,
    hora_apertura, hora_cierre, dias_max_anticipacion, anticipacion_min_min, porcentaje_reservable, abierto,
+   whatsapp_numero, direccion, maps_url, instagram_url, facebook_url, eslogan,
    yape_numero, yape_titular, mensaje_pago)
 VALUES
   (1, 'Quero Gastrobar', 48, 12, 4, 30, 60, 90, 30, 15, 20, 2, 80,
    '12:00', '23:00', 3, 30, NULL, TRUE,
+   '996908138', 'Av. Inca Garcilaso de la Vega 54, Villa María del Triunfo 15816',
+   'https://maps.app.goo.gl/rATMHp75PEziVzCQ8', 'https://www.instagram.com/quero_gastrobar',
+   'https://www.facebook.com/GastrobarPiqueosTragos/', 'El sabor del mar y lo criollo, en un solo lugar.',
    '996908138', 'Quero Gastrobar', 'Envía tu comprobante de pago al WhatsApp 996908138 indicando tu código de pedido.')
 ON CONFLICT (config_id) DO UPDATE SET
   nombre_local = EXCLUDED.nombre_local,
+  whatsapp_numero = EXCLUDED.whatsapp_numero,
+  direccion = EXCLUDED.direccion,
+  maps_url = EXCLUDED.maps_url,
+  instagram_url = EXCLUDED.instagram_url,
+  facebook_url = EXCLUDED.facebook_url,
+  eslogan = EXCLUDED.eslogan,
   yape_numero = EXCLUDED.yape_numero,
   yape_titular = EXCLUDED.yape_titular,
   mensaje_pago = EXCLUDED.mensaje_pago,
