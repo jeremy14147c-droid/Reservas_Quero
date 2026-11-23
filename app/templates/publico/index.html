@@ -1,29 +1,90 @@
-{% extends "base.html" %}
+{% extends "base_cliente.html" %}
 
-{% block titulo %}{{ nombre_local }} - Inicio{% endblock %}
+{% block titulo %}{{ marca.nombre }} - Reservas y pedidos{% endblock %}
 
 {% block contenido %}
-<div class="row justify-content-center">
-    <div class="col-md-8 text-center py-5">
-        <h1 class="display-4 fw-bold text-dark mb-3">{{ nombre_local }}</h1>
-        <p class="lead text-muted mb-4">
-            Disfruta de nuestros mejores platos, ceviches, lomos saltados, broasters, hamburguesas y cócteles.
-        </p>
+<section class="hero-cliente">
+    <span class="hero-etiqueta"><i class="bi bi-star-fill"></i> Comida marina y criolla</span>
 
-        {% if not abierto %}
-            <div class="alert alert-warning d-inline-block px-4 py-2 mb-4">
-                <i class="bi bi-clock-history me-1"></i> El local se encuentra actualmente cerrado para atención.
-            </div>
-        {% endif %}
+    <h1 class="hero-titulo">
+        Bienvenido a <span class="resaltado">{{ marca.nombre }}</span>
+    </h1>
 
-        <div class="d-grid gap-3 d-sm-flex justify-content-sm-center mt-3">
-            <a class="btn btn-warning btn-lg px-4 gap-3 btn-lg-mobile fw-bold shadow-sm" href="{{ url_for('publico.reservar') }}">
-                <i class="bi bi-calendar-check me-2"></i> Reservar Mesa
-            </a>
-            <a class="btn btn-outline-dark btn-lg px-4 btn-lg-mobile fw-bold shadow-sm" href="{{ url_for('publico.pedir') }}">
-                <i class="bi bi-bag-check me-2"></i> Hacer Pedido (recojo)
-            </a>
+    <p class="hero-eslogan">{{ marca.eslogan }}</p>
+
+    <p class="hero-descripcion">
+        Comida marina, criolla, alitas de todos los sabores, piqueos, platos a la carta,
+        frappés, jugos y cócteles. El mejor ambiente y los mejores precios los encuentras aquí.
+    </p>
+
+    {% if not marca.abierto %}
+        <div class="alert alert-warning d-inline-flex align-items-center gap-2 mt-2" role="alert">
+            <i class="bi bi-clock-history"></i>
+            El local está cerrado por ahora. Puedes dejar tu reserva o pedido y el personal lo revisará al abrir.
+        </div>
+    {% endif %}
+
+    <div class="hero-botones">
+        <a class="boton-cliente boton-cliente--rojo" href="{{ url_for('publico.reservar') }}">
+            <i class="bi bi-calendar-check"></i> Reservar mesa
+        </a>
+        <a class="boton-cliente boton-cliente--rojo" href="{{ url_for('publico.pedir') }}">
+            <i class="bi bi-bag-check"></i> Hacer pedido
+        </a>
+        <a class="boton-cliente boton-cliente--contorno" href="{{ url_for('publico.carta') }}">
+            <i class="bi bi-book-half"></i> Ver la carta
+        </a>
+    </div>
+</section>
+
+<section class="row g-3 mb-4" aria-label="Información del local">
+    <div class="col-12 col-md-4">
+        <div class="tarjeta-cliente">
+            <span class="icono-cliente"><i class="bi bi-geo-alt"></i></span>
+            <h3>Cómo llegar</h3>
+            {% if marca.direccion %}
+                <p>{{ marca.direccion }}</p>
+                {% if marca.maps_url %}
+                    <a class="fw-semibold text-danger" href="{{ marca.maps_url }}" target="_blank" rel="noopener noreferrer">
+                        Abrir en Google Maps <i class="bi bi-box-arrow-up-right ms-1"></i>
+                    </a>
+                {% endif %}
+            {% else %}
+                <p><span class="pendiente">Pendiente: dirección</span></p>
+            {% endif %}
         </div>
     </div>
-</div>
+
+    <div class="col-12 col-md-4">
+        <div class="tarjeta-cliente">
+            <span class="icono-cliente"><i class="bi bi-clock"></i></span>
+            <h3>Horario</h3>
+            {% if marca.horario %}
+                <p>{{ marca.horario }}</p>
+            {% else %}
+                <p><span class="pendiente">Pendiente: horario</span></p>
+            {% endif %}
+            {% if marca.abierto %}
+                <span class="badge text-bg-success mt-2"><i class="bi bi-check-circle me-1"></i> Abierto ahora</span>
+            {% else %}
+                <span class="badge text-bg-warning mt-2"><i class="bi bi-clock-history me-1"></i> Cerrado por ahora</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="col-12 col-md-4">
+        <div class="tarjeta-cliente">
+            <span class="icono-cliente"><i class="bi bi-chat-dots"></i></span>
+            <h3>Escríbenos</h3>
+            {% if marca.whatsapp_numero %}
+                <p>Consultas, reservas o pedidos por WhatsApp.</p>
+                <a class="fw-semibold text-danger" href="{{ marca.whatsapp_url }}" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-whatsapp me-1"></i> {{ marca.whatsapp_numero }}
+                </a>
+            {% else %}
+                <p><span class="pendiente">Pendiente: número de WhatsApp</span></p>
+            {% endif %}
+        </div>
+    </div>
+</section>
 {% endblock %}

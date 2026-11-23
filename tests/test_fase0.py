@@ -26,8 +26,8 @@ def test_pagina_inicio_publica(cliente):
     resp = cliente.get("/")
     assert resp.status_code == 200
     assert b"QUERO" in resp.data
-    assert b"Reservar Mesa" in resp.data
-    assert b"Hacer Pedido" in resp.data
+    assert b"Reservar mesa" in resp.data
+    assert b"Hacer pedido" in resp.data
 
 
 def test_proteccion_rutas_staff_sin_login(cliente):
