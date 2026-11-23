@@ -110,7 +110,9 @@ def test_inicio_muestra_identidad_y_datos_del_local(cliente, contacto_temporal):
     assert "Quero Gastrobar" in html
     assert "El sabor del mar y lo criollo" in html
     assert "Av. Inca Garcilaso de la Vega 54" in html
-    assert "Reservar" in html and "Pedir" in html and "Carta" in html
+    assert "Reservar mesa" in html
+    assert "Hacer pedido" in html
+    assert "Ver la carta" in html
 
 
 def test_boton_flotante_de_whatsapp_usa_el_numero_del_local(cliente, contacto_temporal):
