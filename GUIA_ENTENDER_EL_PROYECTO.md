@@ -85,8 +85,8 @@ Reservas_Quero/
     ├── admin/           ← Configuración y personal (solo admin).
     ├── api/             ← Rutas que devuelven JSON (los datos de la pizarra, botones).
     ├── servicios/       ← LAS REGLAS: reservas, clientes, carta, personal, configuracion.
-    ├── templates/       ← HTML con huecos para datos (Jinja2).
-    └── static/          ← CSS y JS que no cambian (style.css, main.js).
+    ├── templates/       ← HTML con huecos para datos (Jinja2): base.html (staff), base_cliente.html (público).
+    └── static/          ← CSS y JS que no cambian (style.css, cliente.css, main.js).
 ```
 
 **Por qué hay una carpeta por tema** (`publico/`, `auth/`, `reservas/`...): cada una es un **Blueprint** (sección 4.4). Es separar el código por módulos, como separarías componentes en JS.
@@ -139,7 +139,7 @@ En `templates/base.html`:
 
 - `{{ algo }}` imprime un valor (como `${algo}` en un template literal).
 - `{% ... %}` son instrucciones (`if`, `for`, `block`).
-- `base.html` es el **molde** (menú, banner "sin conexión"). Las demás páginas hacen `{% extends "base.html" %}` y solo rellenan sus `block`. Es **herencia de plantillas**: escribes el menú una vez.
+- Hay **dos moldes**: `base.html` para el staff (sobrio, con el menú del panel) y `base_cliente.html` para las páginas públicas (logo, accesos directos, contacto, WhatsApp flotante). Las páginas hacen `{% extends "..." %}` y solo rellenan sus `block`. Es **herencia de plantillas**: escribes el menú una vez y, al estar separados, el cliente nunca ve el menú del staff.
 
 ### 4.4 Blueprint: un módulo de rutas
 
@@ -204,7 +204,7 @@ Son como los `scripts` de `package.json`. `manage.py` también crea la `app`, po
 
 ### 4.12 `pytest`: pruebas automáticas
 
-- Cada función `test_...` comprueba una regla. Hay **35 pruebas** en 5 archivos (`tests/`).
+- Cada función `test_...` comprueba una regla. Hay **101 pruebas** en 15 archivos (`tests/` y `tests/unidad/`).
 - `conftest.py` prepara el escenario común (como un `beforeEach` de Jest): crea una app de prueba y usuarios de prueba, y los borra al terminar.
 - Ejecutas `pytest` y debe salir todo en verde. El caché de tu zip muestra **cero fallos** en la última corrida, pero no la ejecuté yo.
 - Ojo: **las pruebas usan tu base de datos real** (la del `.env`). Por eso borran lo que crean.

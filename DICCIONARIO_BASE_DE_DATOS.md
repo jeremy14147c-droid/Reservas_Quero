@@ -97,7 +97,13 @@ Todo lo que la dueña ajusta vive aquí, no en el código. `config_id = 1` (con 
 | `dias_max_anticipacion` | INT, CHECK ≥ 0. | NOT NULL. 0 = solo se reserva para hoy. | Con cuántos días de anticipación se puede reservar. La web lo usa para limitar el calendario. | OK |
 | `anticipacion_min_min` | SMALLINT, DEFAULT 30, CHECK ≥ 0. | NOT NULL. Si no se indica, 30. | Minutos de anticipación mínima para reservar por la web. Las franjas que inician antes de `ahora + anticipacion_min_min` se muestran deshabilitadas ("Ya pasó"). | Nuevo |
 | `porcentaje_reservable` | SMALLINT, CHECK entre 1 y 100. | **NULL permitido, a propósito.** Vacío = 100 %, sin límite adicional. | Qué porcentaje de personas y mesas pueden ocupar las **reservas**; el resto queda libre para quien llega sin reserva. | OK |
-| `abierto` | BOOLEAN, DEFAULT TRUE. | NOT NULL. Por defecto abierto. | Indicaría si el local está abierto. **Hoy ninguna pantalla lo usa.** | D1 |
+| `abierto` | BOOLEAN, DEFAULT TRUE. | NOT NULL. Por defecto abierto. | Si está en FALSE, la web pública avisa "Cerrado por ahora" y el inicio lo muestra. | OK |
+| `whatsapp_numero` | VARCHAR(15). | **NULL permitido.** Si está vacío, se oculta el botón flotante de WhatsApp y el bloque "Escríbenos" muestra "Pendiente". | WhatsApp del local (9 dígitos que empiezan en 9). Se usa en `https://wa.me/51...`. | Nuevo (3.4) |
+| `direccion` | VARCHAR(150). | **NULL permitido.** Si falta, el pie muestra "Pendiente: dirección". | Dirección que se muestra al cliente. | Nuevo (3.4) |
+| `maps_url` | VARCHAR(300). | **NULL permitido.** Debe empezar por `https://` (validado en el servidor). | Enlace de Google Maps para "Cómo llegar". | Nuevo (3.4) |
+| `instagram_url` | VARCHAR(200). | **NULL permitido.** Debe empezar por `https://`. | Red social del local. | Nuevo (3.4) |
+| `facebook_url` | VARCHAR(200). | **NULL permitido.** Debe empezar por `https://`. | Red social del local. | Nuevo (3.4) |
+| `eslogan` | VARCHAR(150). | **NULL permitido.** Si falta, se usa el texto por defecto de `servicios/marca.py`. | Frase corta que aparece bajo el nombre en el inicio. | Nuevo (3.4) |
 | `yape_numero` | VARCHAR(15). Texto porque es un número de contacto, no se hacen cuentas con él. | **NULL permitido.** Si queda vacío, la pantalla de pago no tiene qué mostrar. Hay que llenarlo antes de aceptar pedidos de recojo. | Número al que el cliente paga por Yape. | OK |
 | `yape_titular` | VARCHAR(100). | **NULL permitido.** Si queda vacío, se muestra solo el número. | Nombre del titular, para que el cliente verifique que paga a la cuenta correcta. | OK |
 | `mensaje_pago` | VARCHAR(300). | **NULL permitido.** Si queda vacío, no se muestra nada. | Texto extra junto a las instrucciones de pago. Probablemente innecesario. | D2 |

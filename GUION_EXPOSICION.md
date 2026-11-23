@@ -1,6 +1,6 @@
 > ✅ **ESTADO DEL PROYECTO (Fase 3.R completada):**
 > Este proyecto cuenta con arquitectura en capas estricta: Controlador (blueprints) → Servicio (reglas de negocio) → DAO (acceso a datos en `app/dao/`) → Base de datos (`schema.sql` y `app/db.py`).
-> El 100 % de las sentencias SQL vive en la capa DAO. Los servicios aceptan inyección de dependencias (`dao=...`), lo que permite pruebas unitarias aisladas sin base de datos en `tests/unidad/`, complementadas por pruebas de integración contra PostgreSQL (75 pruebas en total).
+> El 100 % de las sentencias SQL vive en la capa DAO. Los servicios aceptan inyección de dependencias (`dao=...`), lo que permite pruebas unitarias aisladas sin base de datos en `tests/unidad/`, complementadas por pruebas de integración contra PostgreSQL (101 pruebas en total).
 
 # Guion de exposición en vivo — "Diseño de la solución (MVC, TDD, DAO, SOLID)"
 
@@ -44,7 +44,7 @@ Reservas_Quero/
 │   ├── publico/ auth/ reservas/ pedidos/ carta/ admin/ api/   ← CONTROLADOR (blueprints)
 │   ├── servicios/            ← MODELO DE NEGOCIO: reglas puras (sin Flask, sin SQL directo)
 │   └── templates/ static/    ← VISTA (pantallas HTML con Jinja2 y Bootstrap 5)
-└── tests/                    ← SUITE DE PRUEBAS: 13 archivos, 75 pruebas (unitarias en tests/unidad/ e integración)
+└── tests/                    ← SUITE DE PRUEBAS: 15 archivos, 101 pruebas (unitarias en tests/unidad/ e integración)
 ```
 
 ### 🎤 QUÉ DECIR
@@ -204,12 +204,12 @@ Select-String -Path app\servicios\*.py -Pattern "SELECT |INSERT |UPDATE |DELETE 
    ```powershell
    .venv\Scripts\python.exe -X utf8 -m pytest -q
    ```
-   (resultado en vivo: **75 passed in ~20s**)
+   (resultado en vivo: **101 passed in ~30s**)
 2. Con el resultado en pantalla, mostrar `tests/unidad/test_horas_pasadas_unitarias.py` (pruebas unitarias sin BD) y luego `tests/test_fase3_2.py`, **función `test_fn_duracion_estadia_por_tamano`**
    (señalar la línea del `esperado = {1: 30, 3: 30, ...}`)
 
 ### 🎤 QUÉ DECIR
-> "Cada funcionalidad tiene su archivo de pruebas: trabajamos con disciplina **TDD**. Esta suite cuenta con 75 pruebas que corren en unos 20 segundos.
+> "Cada funcionalidad tiene su archivo de pruebas: trabajamos con disciplina **TDD**. Esta suite cuenta con 101 pruebas que corren en unos 30 segundos.
 > Tenemos dos tipos de pruebas claramente separadas:
 > **1)** **Pruebas unitarias puras** en `tests/unidad/`: prueban la lógica de negocio usando DAOs simulados (fakes en memoria), sin tocar la base de datos ni requerir red.
 > **2)** **Pruebas de integración**: prueban reglas de negocio y restricciones complejas contra una base PostgreSQL de verdad.
@@ -249,7 +249,7 @@ Select-String -Path app\servicios\*.py -Pattern "SELECT |INSERT |UPDATE |DELETE 
 | D | `app/servicios/` + `app/dao/` | Inyección de DAO (`dao=None`) + 0 SQL en servicios + 0 Flask |
 | DAO | `app/dao/` | Una clase por entidad (`ReservaDAO`, `PedidoDAO`, etc.) + `db.py` |
 | MVC | árbol de carpetas | `schema.sql` y `app/dao/` (M) · `routes.py` (C) · `templates/` (V) |
-| TDD | `tests/` (13 archivos, 75 pruebas) | `tests/unidad/` (sin BD) + integración en vivo con `pytest -q` |
+| TDD | `tests/` (15 archivos, 101 pruebas) | `tests/unidad/` (sin BD) + integración en vivo con `pytest -q` |
 
 ---
 
@@ -276,7 +276,7 @@ Si te preguntan "¿esto cómo se compara con [Java/C#/JS/HTML/CSS]?", responde c
 
 | Falla | Qué hacer |
 |---|---|
-| pytest tarda o falla por algo raro | Mostrar el archivo de test y decir los números de memoria: "75 pruebas, ~20 s" |
+| pytest tarda o falla por algo raro | Mostrar el archivo de test y decir los números de memoria: "101 pruebas, ~30 s" |
 | La pizarra no carga | Abrir directamente la API `/api/v1/reservas/dia` y decir: "esta es la fuente JSON de la pizarra" |
 | VS Code se pierde en una pestaña | Ir directo a la tabla del CAPÍTULO E (archivo + línea ya memorizados) |
 | Se corta la internet | NADA de este bloque depende de internet: Flask, PostgreSQL y pytest corren 100% local |
