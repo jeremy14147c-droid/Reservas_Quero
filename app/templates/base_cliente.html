@@ -48,25 +48,26 @@
         <div class="container">
             <div class="d-flex align-items-center justify-content-between py-2 gap-3">
                 <a class="logo-cliente" href="{{ url_for('publico.inicio') }}" aria-label="Ir al inicio de {{ marca.nombre }}">
-                    {% if logo_existe %}
-                        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo de {{ marca.nombre | upper }}">
-                    {% else %}
-                        <span class="wordmark" id="marca-texto">
-                            <span class="wordmark-quero">QUERO</span>
-                            <span class="wordmark-gastrobar">GASTROBAR</span>
-                        </span>
-                    {% endif %}
+                    <span class="wordmark" id="marca-texto">
+                        <span class="wordmark-quero">QUERO</span>
+                        <span class="wordmark-gastrobar">GASTROBAR</span>
+                    </span>
                 </a>
 
-                {% if marca.abierto %}
-                    <span class="badge rounded-pill text-bg-success d-none d-sm-inline-flex">
-                        <i class="bi bi-check-circle me-1"></i> Abierto ahora
-                    </span>
-                {% else %}
-                    <span class="badge rounded-pill text-bg-warning d-none d-sm-inline-flex">
-                        <i class="bi bi-clock-history me-1"></i> Cerrado por ahora
-                    </span>
-                {% endif %}
+                <div class="d-flex align-items-center gap-2">
+                    {% if marca.abierto %}
+                        <span class="badge rounded-pill text-bg-success d-none d-sm-inline-flex">
+                            <i class="bi bi-check-circle me-1"></i> Abierto ahora
+                        </span>
+                    {% else %}
+                        <span class="badge rounded-pill text-bg-warning d-none d-sm-inline-flex">
+                            <i class="bi bi-clock-history me-1"></i> Cerrado por ahora
+                        </span>
+                    {% endif %}
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-outline-secondary" title="Panel de administración y personal">
+                        <i class="bi bi-shield-lock me-1"></i> Acceso personal
+                    </a>
+                </div>
             </div>
 
             <nav class="accesos-cliente" aria-label="Accesos rápidos del cliente">
@@ -86,6 +87,9 @@
                     <i class="bi bi-whatsapp"></i> WhatsApp
                 </a>
                 {% endif %}
+                <a class="acceso" href="{{ url_for('auth.login') }}">
+                    <i class="bi bi-shield-lock"></i> Acceso personal
+                </a>
             </nav>
         </div>
     </header>

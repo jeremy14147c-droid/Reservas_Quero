@@ -121,7 +121,7 @@ body.pagina-cliente {
 
 .wordmark .wordmark-quero {
     font-family: var(--fuente-titulos);
-    font-size: 2rem;
+    font-size: 2.2rem;
     font-weight: 800;
     letter-spacing: 0.02em;
     background: linear-gradient(100deg, var(--quero-rojo) 0%, var(--quero-naranja) 55%, var(--quero-amarillo) 100%);
@@ -492,7 +492,7 @@ body.pagina-cliente {
     }
 
     .wordmark .wordmark-quero {
-        font-size: 1.7rem;
+        font-size: 1.9rem;
     }
 
     .hero-cliente {
