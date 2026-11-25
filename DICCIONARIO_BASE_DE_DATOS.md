@@ -14,6 +14,8 @@ Explica **columna por columna**: qué guarda, por qué tiene ese tipo, por qué 
 | `plato.codigo` **nuevo** | Número corto y opcional para buscar un plato (no es el ID). |
 | Vista `v_cliente_actividad_24h` **nueva** | Pedidos y reservas recientes del cliente. |
 | `fn_carga_dia` devuelve `nivel` | `ok`, `alerta` o `excedido`. |
+| `config_local` **contacto y marca** | `whatsapp_numero`, `direccion`, `maps_url`, `instagram_url`, `facebook_url`, `eslogan` (migración `004`). |
+| `categoria.es_complemento` **nuevo** | Categorías que se sugieren como complemento en el carrito (migración `005`). |
 
 Siguen **sin decidir** los puntos D1, D2, D4, D5, D6, D7, D9 a D21 de la sección 8. Mientras no se decidan, esas columnas y tablas permanecen en el esquema.
 
@@ -129,6 +131,7 @@ Se identifica por teléfono y se reutiliza si vuelve. No hay cuenta, contraseña
 | `nombre` | VARCHAR(50), UNIQUE. | NOT NULL. No puede haber dos categorías con el mismo nombre. | Título de la categoría en la carta. | OK |
 | `orden` | SMALLINT, DEFAULT 0. Pocas categorías, número chico. | NOT NULL. Por defecto 0 (empatan y se ordenan por nombre). | Posición en la carta (menor número primero). | OK |
 | `activa` | BOOLEAN, DEFAULT TRUE. | NOT NULL. Por defecto visible. | Oculta una categoría sin borrarla. | OK |
+| `es_complemento` | BOOLEAN, DEFAULT FALSE. | NOT NULL. Por defecto no es complemento. | Si es TRUE, sus platos disponibles se ofrecen en el bloque "Complementa tu pedido" del carrito (máximo 3). Se cambia desde Carta Staff (solo admin) o al crear la categoría. | Nuevo (3.5) |
 
 ### 2.5 `plato` – Carta
 Un plato con dos precios (personal/fuente, 1 L/1½ L) se registra como **dos platos**, uno por tamaño, cada uno con su precio y su código. Los sabores sin cambio de precio van en la nota del pedido, no como platos distintos. Los ingredientes van en `descripcion`.

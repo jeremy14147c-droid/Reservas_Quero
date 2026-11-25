@@ -1,10 +1,10 @@
-# ESTADO ACTUAL – léelo primero (actualizado el 22/11/2026)
+# ESTADO ACTUAL – léelo primero (actualizado el 24/11/2026)
 
 Archivo para el equipo y el agente. Si algo contradice a otro documento del repo, manda este archivo y luego `AGENTS.md`.
 
 ## 1. Dónde estamos
-- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), **Fases S1 + S2 de Seguridad (Semana 14)** (sesión revocable, fuerza bruta, redirect seguro, cabeceras, UUID), **Fase 3.R (Capa DAO y desacoplamiento)** (100% del SQL en `app/dao/`), **Fase 3.3 (Horas pasadas y vencimiento automático)** y **Fase 3.4 (Identidad visual del cliente)**: `base_cliente.html` + `cliente.css`, accesos directos, pie con dirección/horario/mapa/redes, botón flotante de WhatsApp, inicio tipo restaurante y sección "Contacto y marca" en Administración con validación https/WhatsApp. **101 pruebas en verde**.
-- Siguiente paso: **Fase 3.5** (Carta y pedido en celular). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
+- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), **Fases S1 + S2 de Seguridad (Semana 14)** (sesión revocable, fuerza bruta, redirect seguro, cabeceras, UUID), **Fase 3.R (Capa DAO y desacoplamiento)** (100% del SQL en `app/dao/`), **Fase 3.3 (Horas pasadas y vencimiento automático)**, **Fase 3.4 (Identidad visual del cliente)** y **Fase 3.5 (Carta y pedido en celular)**: chips de categorías con scroll lateral, acordeón por categoría, buscador por nombre o número, tarjetas con +/− y espacio reservado para imagen, barra inferior "Ver pedido", panel (offcanvas) con el carrito guardado en `sessionStorage`, bloque "Complementa tu pedido" (`categoria.es_complemento`, migración `005`), carta pública en acordeón y casilla en Carta Staff. **110 pruebas en verde**.
+- Siguiente paso: **Fase 3.6** (Cocina: imprimir y recojo primero). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
 
 ## 2. Problemas detectados (verificados)
 1. [RESUELTO en 3.0] `.venv/` ya no está versionado en Git (se eliminó del índice con `git rm -r --cached .venv`). `.env` no está en el historial (revisado).
@@ -34,8 +34,8 @@ Archivo para el equipo y el agente. Si algo contradice a otro documento del repo
 | 3.R | Capa DAO real y arranque del TDD | 3.0 | Completado (65 tests en verde) |
 | 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R | Completado (75 tests en verde) |
 | 3.4 | Identidad visual del cliente | 3.3 | Completado (101 tests en verde) |
-| 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 | Siguiente |
-| 3.6 | Cocina: imprimir y recojo primero | 3.5 | Pendiente |
+| 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 | Completado (110 tests en verde) |
+| 3.6 | Cocina: imprimir y recojo primero | 3.5 | Siguiente |
 | 3.7 | Pago con comprobante | 3.6 | Pendiente |
 | 3.8 | WhatsApp sin costo (mensajes y botones) | 3.7 | Pendiente |
 | 3.9 | Imágenes de platos (opcional) | 3.7 | Pendiente |
@@ -50,13 +50,14 @@ La numeración de `FASE_3_1_CAMBIOS.md` queda **reemplazada** por esta.
 5. Probar en el navegador y reportar. Los documentos de defensa solo afirman lo que el código y `git log` demuestran.
 
 ## 6. Pendiente de decidir (Jeremy)
-- Guardar el logo real (el que envió la dueña) como `app/static/img/logo.png`. Mientras no exista, la web muestra el wordmark "QUERO GASTROBAR" con los colores de la marca.
-- Elegir la tipografía definitiva entre las 3 opciones de la vista previa (hoy aplicada: Fraunces + Inter; se cambia en 2 líneas de `base_cliente.html` y 2 variables de `cliente.css`).
+- [RESUELTO] Logo real guardado como `app/static/img/logo.png` (el original también quedó en `app/static/img/Quero_Gastrobar_logo.jpg`). Optimizarlo (pesa ~299 KB y tiene fondo blanco) queda como mejora opcional.
+- [RESUELTO] Tipografía: **Opción B · Clásica elegante** (`Playfair Display` + `Source Sans 3`). Las opciones A y C están documentadas en `GUIA_TIPOGRAFIA_CLIENTE.md` con la vista previa `docs/preview_tipografias.html`.
+- Confirmar con la dueña si el acceso a la **carta pública** (`/carta`) debe seguir existiendo: en la Fase 3.5 se quitó de los accesos del inicio y del menú (hoy solo se llega por URL directa) porque todo se elige dentro de `/pedir`.
 - Si el margen mínimo de anticipación para reservar por la web es 30 min (valor por defecto editable) o 0.
 - Confirmar con la dueña el vencimiento automático (pendientes vencidas → rechazadas; confirmadas sin "Llegó" → no llegó automático): puede inflar las estadísticas de "no llegó" si el staff olvida marcar la llegada.
 - Dónde se publica definitivamente (hoy: Render + Neon) y si se usa un dominio propio.
 - Si hay fotos reales de los platos (decide si se hace la 3.9).
-- Decidir qué hacer con el prototipo Node/Express antiguo de la raíz (`server.js`, `package.json`, `db.js`, etc.): moverlo a `_prototipo_antiguo/` o borrarlo antes de la sustentación.
+- [RESUELTO] El prototipo Node/Express antiguo se movió a `_prototipo_antiguo/` (con su README) y se conserva en el historial de Git.
 
 ## 7. No hacer
 Usar la API de WhatsApp, agregar ORM o frameworks de JavaScript, volver a escribir SQL dentro de servicios o rutas, tocar fases cerradas sin pedirlo, ni inventar datos del local.

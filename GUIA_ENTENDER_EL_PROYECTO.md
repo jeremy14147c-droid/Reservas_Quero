@@ -204,7 +204,7 @@ Son como los `scripts` de `package.json`. `manage.py` también crea la `app`, po
 
 ### 4.12 `pytest`: pruebas automáticas
 
-- Cada función `test_...` comprueba una regla. Hay **101 pruebas** en 15 archivos (`tests/` y `tests/unidad/`).
+- Cada función `test_...` comprueba una regla. Hay **110 pruebas** en 17 archivos (`tests/` y `tests/unidad/`).
 - `conftest.py` prepara el escenario común (como un `beforeEach` de Jest): crea una app de prueba y usuarios de prueba, y los borra al terminar.
 - Ejecutas `pytest` y debe salir todo en verde. El caché de tu zip muestra **cero fallos** en la última corrida, pero no la ejecuté yo.
 - Ojo: **las pruebas usan tu base de datos real** (la del `.env`). Por eso borran lo que crean.
