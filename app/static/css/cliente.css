@@ -14,8 +14,29 @@
     --quero-gris: #6b6259;
     --quero-blanco: #ffffff;
 
-    --fuente-titulos: "Fraunces", Georgia, "Times New Roman", serif;
-    --fuente-texto: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    /* ---------------------------------------------------------------
+       TIPOGRAFÍA · Opción B activa ("Clásica elegante").
+       Para cambiar de estilo: comenta el par activo, descomenta otro y
+       actualiza el <link> de Google Fonts en app/templates/base_cliente.html.
+       La vista previa y las instrucciones están en GUIA_TIPOGRAFIA_CLIENTE.md.
+
+       A) Cálida moderna:
+          --fuente-titulos: "Fraunces", Georgia, "Times New Roman", serif;
+          --fuente-texto: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+          Google Fonts: family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Inter:wght@400;500;600;700
+
+       B) Clásica elegante (ACTIVA):
+          --fuente-titulos: "Playfair Display", Georgia, "Times New Roman", serif;
+          --fuente-texto: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+          Google Fonts: family=Playfair+Display:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700
+
+       C) Pollería casual:
+          --fuente-titulos: "Bebas Neue", Impact, sans-serif;
+          --fuente-texto: "Lato", system-ui, -apple-system, "Segoe UI", sans-serif;
+          Google Fonts: family=Bebas+Neue&family=Lato:wght@400;700
+       --------------------------------------------------------------- */
+    --fuente-titulos: "Playfair Display", Georgia, "Times New Roman", serif;
+    --fuente-texto: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
     --radio: 1rem;
     --radio-grande: 1.5rem;
@@ -101,7 +122,7 @@ body.pagina-cliente {
 .wordmark .wordmark-quero {
     font-family: var(--fuente-titulos);
     font-size: 2rem;
-    font-weight: 900;
+    font-weight: 800;
     letter-spacing: 0.02em;
     background: linear-gradient(100deg, var(--quero-rojo) 0%, var(--quero-naranja) 55%, var(--quero-amarillo) 100%);
     -webkit-background-clip: text;

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vista previa de tipografías · Quero Gastrobar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;800&family=Source+Sans+3:wght@400;600;700&family=Bebas+Neue&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{--rojo:#c8382b;--naranja:#e08a2e;--amarillo:#f2b233;--crema:#faf7f2;--tinta:#1e1b18;--gris:#6b6259}
+  *{box-sizing:border-box}
+  body{margin:0;background:#efe9df;color:var(--tinta);font-family:system-ui,sans-serif;padding:2rem 1rem}
+  h1.pagina{text-align:center;font-size:1.3rem;letter-spacing:.05em;text-transform:uppercase;color:var(--gris);margin-bottom:1.5rem}
+  .grid{display:grid;gap:1.2rem;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));max-width:1200px;margin:0 auto}
+  .panel{background:var(--crema);border-radius:1.2rem;padding:1.5rem;box-shadow:0 12px 30px rgba(0,0,0,.08)}
+  .etiqueta{display:inline-block;background:var(--tinta);color:#fff;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;padding:.3rem .6rem;border-radius:999px;margin-bottom:1rem}
+  .wordmark{display:inline-flex;flex-direction:column;line-height:1}
+  .wordmark .q{font-size:2.2rem;font-weight:900;background:linear-gradient(100deg,var(--rojo),var(--naranja) 55%,var(--amarillo));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .wordmark .g{font-size:.62rem;font-weight:700;letter-spacing:.55em;color:var(--rojo);margin-top:.2rem}
+  .eslogan{font-size:1.05rem;font-weight:600;margin:.8rem 0 .4rem}
+  .texto{color:var(--gris);font-size:.95rem;line-height:1.55;margin:0 0 1rem}
+  .boton{display:inline-block;background:var(--rojo);color:#fff;font-weight:700;font-size:.95rem;padding:.7rem 1.2rem;border-radius:999px;text-decoration:none}
+  .muestra{font-weight:600;margin:.2rem 0}
+  .muestra small{display:block;color:var(--gris);font-weight:400;font-size:.75rem;letter-spacing:.04em;margin-top:.2rem}
+  /* Opción A */
+  .a h2,.a .q{font-family:'Fraunces',Georgia,serif}
+  .a .eslogan,.a .texto,.a .g,.a .boton{font-family:'Inter',system-ui,sans-serif}
+  /* Opción B */
+  .b h2,.b .q{font-family:'Playfair Display',Georgia,serif}
+  .b .eslogan,.b .texto,.b .g,.b .boton{font-family:'Source Sans 3',system-ui,sans-serif}
+  /* Opción C */
+  .c h2,.c .q{font-family:'Bebas Neue',Impact,sans-serif;letter-spacing:.02em}
+  .c .eslogan,.c .texto,.c .g,.c .boton{font-family:'Lato',system-ui,sans-serif}
+  h2{font-size:1.9rem;line-height:1.05;margin:.6rem 0}
+  .paleta{display:flex;gap:.4rem;margin-top:1rem}
+  .paleta span{width:34px;height:34px;border-radius:9px;border:1px solid rgba(0,0,0,.08)}
+</style>
+</head>
+<body>
+<h1 class="pagina">Elige la tipografía · Quero Gastrobar</h1>
+<div class="grid">
+
+  <section class="panel a">
+    <span class="etiqueta">Opción A · Cálida moderna (aplicada ahora)</span>
+    <div class="wordmark"><span class="q">QUERO</span><span class="g">GASTROBAR</span></div>
+    <h2>El sabor del mar<br>y lo criollo</h2>
+    <p class="eslogan">El sabor del mar y lo criollo, en un solo lugar.</p>
+    <p class="texto">Comida marina, criolla, alitas de todos los sabores, piqueos, platos a la carta, frappés, jugos y cócteles.</p>
+    <a class="boton" href="#">Reservar mesa</a>
+    <p class="muestra">Fraunces + Inter<small>Títulos con personalidad, texto muy legible</small></p>
+    <div class="paleta"><span style="background:#c8382b"></span><span style="background:#e08a2e"></span><span style="background:#f2b233"></span><span style="background:#faf7f2"></span><span style="background:#1e1b18"></span></div>
+  </section>
+
+  <section class="panel b">
+    <span class="etiqueta">Opción B · Clásica elegante</span>
+    <div class="wordmark"><span class="q">QUERO</span><span class="g">GASTROBAR</span></div>
+    <h2>El sabor del mar<br>y lo criollo</h2>
+    <p class="eslogan">El sabor del mar y lo criollo, en un solo lugar.</p>
+    <p class="texto">Comida marina, criolla, alitas de todos los sabores, piqueos, platos a la carta, frappés, jugos y cócteles.</p>
+    <a class="boton" href="#">Reservar mesa</a>
+    <p class="muestra">Playfair Display + Source Sans 3<small>Más formal, tipo carta de restaurante clásico</small></p>
+    <div class="paleta"><span style="background:#c8382b"></span><span style="background:#e08a2e"></span><span style="background:#f2b233"></span><span style="background:#faf7f2"></span><span style="background:#1e1b18"></span></div>
+  </section>
+
+  <section class="panel c">
+    <span class="etiqueta">Opción C · Pollería casual</span>
+    <div class="wordmark"><span class="q">QUERO</span><span class="g">GASTROBAR</span></div>
+    <h2>El sabor del mar<br>y lo criollo</h2>
+    <p class="eslogan">El sabor del mar y lo criollo, en un solo lugar.</p>
+    <p class="texto">Comida marina, criolla, alitas de todos los sabores, piqueos, platos a la carta, frappés, jugos y cócteles.</p>
+    <a class="boton" href="#">Reservar mesa</a>
+    <p class="muestra">Bebas Neue + Lato<small>Títulos grandes e informales, estilo aviso de pollería</small></p>
+    <div class="paleta"><span style="background:#c8382b"></span><span style="background:#e08a2e"></span><span style="background:#f2b233"></span><span style="background:#faf7f2"></span><span style="background:#1e1b18"></span></div>
+  </section>
+
+</div>
+</body>
+</html>
