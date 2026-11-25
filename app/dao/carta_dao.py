@@ -8,37 +8,44 @@ class CartaDAO:
     def listar_categorias_activas(self):
         """Lista las categorías activas ordenadas por orden y nombre."""
         return consultar_todos(
-            "SELECT categoria_id, nombre, orden "
+            "SELECT categoria_id, nombre, orden, es_complemento "
             "FROM categoria WHERE activa = TRUE ORDER BY orden, nombre"
         )
 
     def listar_todas_categorias(self):
         """Lista todas las categorías (activas e inactivas) para el staff."""
         return consultar_todos(
-            "SELECT categoria_id, nombre, orden, activa "
+            "SELECT categoria_id, nombre, orden, activa, es_complemento "
             "FROM categoria ORDER BY orden, nombre"
         )
 
     def buscar_categoria_por_id(self, categoria_id):
         """Busca una categoría por su ID."""
         return consultar_uno(
-            "SELECT categoria_id, nombre, orden, activa FROM categoria WHERE categoria_id = %s",
+            "SELECT categoria_id, nombre, orden, activa, es_complemento FROM categoria WHERE categoria_id = %s",
             (categoria_id,)
         )
 
     def buscar_categoria_por_nombre(self, nombre):
         """Busca una categoría por su nombre sin distinguir mayúsculas."""
         return consultar_uno(
-            "SELECT categoria_id, nombre, activa FROM categoria WHERE lower(nombre) = lower(%s)",
+            "SELECT categoria_id, nombre, activa, es_complemento FROM categoria WHERE lower(nombre) = lower(%s)",
             (nombre.strip(),)
         )
 
-    def insertar_categoria(self, nombre, orden):
+    def insertar_categoria(self, nombre, orden, es_complemento=False):
         """Crea una nueva categoría."""
         return ejecutar_retornando(
-            "INSERT INTO categoria (nombre, orden, activa) VALUES (%s, %s, TRUE) "
-            "RETURNING categoria_id, nombre, orden, activa",
-            (nombre, orden)
+            "INSERT INTO categoria (nombre, orden, activa, es_complemento) VALUES (%s, %s, TRUE, %s) "
+            "RETURNING categoria_id, nombre, orden, activa, es_complemento",
+            (nombre, orden, bool(es_complemento))
+        )
+
+    def cambiar_categoria_complemento(self, categoria_id, es_complemento):
+        """Actualiza el estado de sugerencia como complemento de una categoría."""
+        ejecutar(
+            "UPDATE categoria SET es_complemento = %s WHERE categoria_id = %s",
+            (bool(es_complemento), categoria_id)
         )
 
     def listar_platos_activos(self):

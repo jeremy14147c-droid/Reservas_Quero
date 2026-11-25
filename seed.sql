@@ -12,12 +12,12 @@ INSERT INTO config_local
    whatsapp_numero, direccion, maps_url, instagram_url, facebook_url, eslogan,
    yape_numero, yape_titular, mensaje_pago)
 VALUES
-  (1, 'Quero Gastrobar', 48, 12, 4, 30, 60, 90, 30, 15, 20, 2, 80,
-   '12:00', '23:00', 3, 30, NULL, TRUE,
+  (1, 'Quero Gastrobar', 60, 15, 4, 30, 60, 90, 30, 20, 20, 2, 80,
+   '12:00', '23:00', 2, 30, NULL, TRUE,
    '996908138', 'Av. Inca Garcilaso de la Vega 54, Villa María del Triunfo 15816',
    'https://maps.app.goo.gl/rATMHp75PEziVzCQ8', 'https://www.instagram.com/quero_gastrobar',
    'https://www.facebook.com/GastrobarPiqueosTragos/', 'El sabor del mar y lo criollo, en un solo lugar.',
-   '996908138', 'Quero Gastrobar', 'Envía tu comprobante de pago al WhatsApp 996908138 indicando tu código de pedido.')
+   '996908138', 'Jhoana', 'Envía tu comprobante de pago al WhatsApp 996908138 indicando tu código de pedido.')
 ON CONFLICT (config_id) DO UPDATE SET
   nombre_local = EXCLUDED.nombre_local,
   whatsapp_numero = EXCLUDED.whatsapp_numero,
@@ -34,23 +34,23 @@ ON CONFLICT (config_id) DO UPDATE SET
 -- existe; si ya existe NO se sobrescriben, para no borrar los ajustes hechos por la dueña.
 
 -- 1. Categorías en orden oficial: primero comidas (Cara 1) y luego bebidas (Cara 2)
-INSERT INTO categoria (nombre, orden, activa) VALUES
-  ('Ceviches', 1, TRUE),
-  ('Dúos y Tríos Marinos', 2, TRUE),
-  ('Chicharrones y Jaleas', 3, TRUE),
-  ('Arroces', 4, TRUE),
-  ('Filetes y Pescados', 5, TRUE),
-  ('Sopas', 6, TRUE),
-  ('Platos Criollos y Fondos', 7, TRUE),
-  ('Hamburguesas', 8, TRUE),
-  ('Piqueos y Alitas', 9, TRUE),
-  ('Tequeños', 10, TRUE),
-  ('Guarniciones', 11, TRUE),
-  ('Cócteles', 12, TRUE),
-  ('Cervezas', 13, TRUE),
-  ('Bebidas y Jugos', 14, TRUE),
-  ('Bebidas Calientes', 15, TRUE)
-ON CONFLICT (nombre) DO UPDATE SET orden = EXCLUDED.orden;
+INSERT INTO categoria (nombre, orden, activa, es_complemento) VALUES
+  ('Ceviches', 1, TRUE, FALSE),
+  ('Dúos y Tríos Marinos', 2, TRUE, FALSE),
+  ('Chicharrones y Jaleas', 3, TRUE, FALSE),
+  ('Arroces', 4, TRUE, FALSE),
+  ('Filetes y Pescados', 5, TRUE, FALSE),
+  ('Sopas', 6, TRUE, FALSE),
+  ('Platos Criollos y Fondos', 7, TRUE, FALSE),
+  ('Hamburguesas', 8, TRUE, FALSE),
+  ('Piqueos y Alitas', 9, TRUE, FALSE),
+  ('Tequeños', 10, TRUE, TRUE),
+  ('Guarniciones', 11, TRUE, TRUE),
+  ('Cócteles', 12, TRUE, TRUE),
+  ('Cervezas', 13, TRUE, TRUE),
+  ('Bebidas y Jugos', 14, TRUE, TRUE),
+  ('Bebidas Calientes', 15, TRUE, TRUE)
+ON CONFLICT (nombre) DO UPDATE SET orden = EXCLUDED.orden, es_complemento = EXCLUDED.es_complemento;
 
 -- Limpiar platos anteriores de ejemplo si no tienen pedidos vinculados
 DELETE FROM plato WHERE NOT EXISTS (SELECT 1 FROM detalle_pedido WHERE detalle_pedido.plato_id = plato.plato_id);

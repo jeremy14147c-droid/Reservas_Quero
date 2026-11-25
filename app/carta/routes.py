@@ -77,13 +77,31 @@ def crear_categoria():
     """Crea una nueva categoría (solo rol admin)."""
     nombre = request.form.get("nombre")
     orden = request.form.get("orden", 0)
+    es_complemento = bool(request.form.get("es_complemento"))
 
     try:
-        servicio_carta.crear_categoria(nombre, orden)
+        servicio_carta.crear_categoria(nombre, orden, es_complemento=es_complemento)
         flash("Categoría creada exitosamente.", "success")
     except ValueError as e:
         flash(str(e), "danger")
     except Exception:
         flash("Ocurrió un error al registrar la categoría.", "danger")
+
+    return redirect(url_for("carta.listar"))
+
+
+@carta_bp.route("/categoria/<int:categoria_id>/complemento", methods=["POST"])
+@requiere_rol("admin")
+def cambiar_complemento(categoria_id):
+    """Cambia si una categoría se sugiere como complemento al armar pedidos (solo admin)."""
+    es_comp = request.form.get("es_complemento") == "1" or request.form.get("es_complemento") == "true"
+    try:
+        cat = servicio_carta.cambiar_categoria_complemento(categoria_id, es_comp)
+        estado_txt = "marcada como complemento sugerido" if cat["es_complemento"] else "desmarcada de complementos"
+        flash(f"Categoría '{cat['nombre']}' {estado_txt}.", "success")
+    except ValueError as e:
+        flash(str(e), "danger")
+    except Exception:
+        flash("Ocurrió un error al actualizar la categoría.", "danger")
 
     return redirect(url_for("carta.listar"))

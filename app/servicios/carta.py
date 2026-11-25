@@ -41,10 +41,62 @@ def obtener_carta_publica(dao=None):
             resultado.append({
                 "categoria_id": c["categoria_id"],
                 "nombre": c["nombre"],
+                "orden": c.get("orden", 0),
+                "es_complemento": bool(c.get("es_complemento", False)),
                 "platos": lista_platos
             })
 
     return resultado
+
+
+def filtrar_platos_complementarios(categorias, platos, limite=3):
+    """Regla PURA (sin base de datos): devuelve hasta `limite` platos disponibles
+    que pertenezcan a categorías activas marcadas como complemento (es_complemento = True).
+    Si no hay categorías de complemento o no hay platos disponibles, retorna lista vacía.
+    """
+    if not categorias or not platos:
+        return []
+
+    # Identificar IDs de categorías activas que sean complementos
+    cats_complemento = {
+        c["categoria_id"]
+        for c in categorias
+        if c.get("activa", True) and c.get("es_complemento", False)
+    }
+
+    if not cats_complemento:
+        return []
+
+    # Mapear orden de categorías para mantener prelación
+    orden_cats = {c["categoria_id"]: c.get("orden", 0) for c in categorias}
+
+    candidatos = []
+    for p in platos:
+        if (
+            p.get("categoria_id") in cats_complemento
+            and p.get("activo", True)
+            and p.get("disponible", True)
+        ):
+            candidatos.append(p)
+
+    # Ordenar por orden de categoría y luego por código o nombre
+    candidatos.sort(
+        key=lambda p: (
+            orden_cats.get(p.get("categoria_id"), 0),
+            p.get("codigo") or 999999,
+            p.get("nombre", "")
+        )
+    )
+
+    return candidatos[:limite]
+
+
+def obtener_platos_complementarios(limite=3, dao=None):
+    """Devuelve hasta `limite` platos complementarios activos y disponibles."""
+    dao = dao or carta_dao_default
+    categorias = dao.listar_categorias_activas()
+    platos = dao.listar_platos_activos()
+    return filtrar_platos_complementarios(categorias, platos, limite=limite)
 
 
 def obtener_carta_staff(dao=None):
@@ -202,7 +254,7 @@ def desactivar_plato(plato_id, dao=None):
     return {"plato_id": plato_id, "nombre": plato["nombre"], "codigo": plato["codigo"], "activo": False}
 
 
-def crear_categoria(nombre, orden=0, dao=None):
+def crear_categoria(nombre, orden=0, es_complemento=False, dao=None):
     """Crea una nueva categoría de platos."""
     dao = dao or carta_dao_default
     nombre_limpio = (nombre or "").strip()
@@ -213,4 +265,19 @@ def crear_categoria(nombre, orden=0, dao=None):
     if existente:
         raise ValueError("Ya existe una categoría con ese nombre.")
 
-    return dao.insertar_categoria(nombre_limpio, int(orden or 0))
+    return dao.insertar_categoria(nombre_limpio, int(orden or 0), bool(es_complemento))
+
+
+def cambiar_categoria_complemento(categoria_id, es_complemento, dao=None):
+    """Actualiza si una categoría es sugerida como complemento."""
+    dao = dao or carta_dao_default
+    categoria = dao.buscar_categoria_por_id(categoria_id)
+    if not categoria:
+        raise ValueError("La categoría no existe.")
+
+    dao.cambiar_categoria_complemento(categoria_id, bool(es_complemento))
+    return {
+        "categoria_id": categoria_id,
+        "nombre": categoria["nombre"],
+        "es_complemento": bool(es_complemento)
+    }

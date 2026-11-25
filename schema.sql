@@ -104,10 +104,11 @@ CREATE INDEX ix_cliente_correo ON cliente (lower(correo)) WHERE correo IS NOT NU
 
 -- ---------- Carta ----------
 CREATE TABLE categoria (
-  categoria_id  INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  nombre        VARCHAR(50) NOT NULL UNIQUE,
-  orden         SMALLINT    NOT NULL DEFAULT 0,
-  activa        BOOLEAN     NOT NULL DEFAULT TRUE
+  categoria_id   INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  nombre         VARCHAR(50) NOT NULL UNIQUE,
+  orden          SMALLINT    NOT NULL DEFAULT 0,
+  activa         BOOLEAN     NOT NULL DEFAULT TRUE,
+  es_complemento BOOLEAN     NOT NULL DEFAULT FALSE
 );
 
 -- Un plato con dos precios (personal / fuente, 1 L / 1½ L) se registra como DOS platos,

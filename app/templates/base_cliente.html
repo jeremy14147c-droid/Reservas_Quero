@@ -49,7 +49,7 @@
             <div class="d-flex align-items-center justify-content-between py-2 gap-3">
                 <a class="logo-cliente" href="{{ url_for('publico.inicio') }}" aria-label="Ir al inicio de {{ marca.nombre }}">
                     {% if logo_existe %}
-                        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo de {{ marca.nombre }}">
+                        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo de {{ marca.nombre | upper }}">
                     {% else %}
                         <span class="wordmark" id="marca-texto">
                             <span class="wordmark-quero">QUERO</span>
@@ -75,9 +75,6 @@
                 </a>
                 <a class="acceso" href="{{ url_for('publico.pedir') }}">
                     <i class="bi bi-bag-check"></i> Hacer pedido
-                </a>
-                <a class="acceso" href="{{ url_for('publico.carta') }}">
-                    <i class="bi bi-book-half"></i> Carta
                 </a>
                 {% if marca.maps_url %}
                 <a class="acceso" href="{{ marca.maps_url }}" target="_blank" rel="noopener noreferrer">
@@ -192,6 +189,11 @@
 
             <div class="pie-legal text-center">
                 {{ marca.nombre }} &bull; Sistema web de reservas y pedidos &bull; Lima, Perú
+                <div class="mt-2">
+                    <a href="{{ url_for('auth.login') }}" class="enlace-staff-pie text-muted small text-decoration-none" title="Panel de administración y personal">
+                        <i class="bi bi-shield-lock me-1"></i>Acceso personal (Staff)
+                    </a>
+                </div>
             </div>
         </div>
     </footer>

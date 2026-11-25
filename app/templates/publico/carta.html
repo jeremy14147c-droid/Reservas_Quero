@@ -2,98 +2,147 @@
 
 {% block titulo %}Nuestra Carta - {{ nombre_local }}{% endblock %}
 
-{% block estilos %}
-<style>
-    .plato-agotado {
-        opacity: 0.6;
-        filter: grayscale(40%);
-    }
-    .badge-agotado {
-        font-size: 0.85rem;
-        letter-spacing: 0.5px;
-    }
-    .nav-pills .nav-link.active {
-        background-color: var(--bs-warning);
-        color: #212529;
-        font-weight: 700;
-    }
-    .nav-pills .nav-link {
-        color: #495057;
-        font-weight: 500;
-    }
-</style>
-{% endblock %}
-
 {% block contenido %}
-<div class="row mb-4">
-    <div class="col-12 text-center">
-        <h1 class="fw-bold display-5 mb-2"><i class="bi bi-book-half text-warning me-2"></i>Nuestra Carta</h1>
-        <p class="text-muted lead">Descubre nuestra variedad de platos marinos, criollos, piqueos y coctelería</p>
-    </div>
-</div>
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-8">
 
-{% if not carta %}
-    <div class="alert alert-info text-center py-4">
-        <i class="bi bi-info-circle display-4 d-block mb-2"></i>
-        Estamos actualizando nuestra carta. Por favor, vuelve a visitarnos en unos momentos.
-    </div>
-{% else %}
-    <!-- Filtros por categoría (Pills navegables) -->
-    <div class="d-flex justify-content-center flex-wrap gap-2 mb-4">
-        {% for cat in carta %}
-            <a href="#cat-{{ cat.categoria_id }}" class="btn btn-outline-dark btn-sm rounded-pill px-3">
-                {{ cat.nombre }}
-            </a>
-        {% endfor %}
-    </div>
+        <!-- Banner de aviso y acceso a pedir para recojo -->
+        <div class="card border-0 shadow-sm mb-4 bg-white" style="border-left: 5px solid var(--quero-rojo) !important;">
+            <div class="card-body p-3 p-md-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h4 fw-bold mb-1 text-danger">
+                        <i class="bi bi-book-half me-2"></i>Nuestra Carta
+                    </h2>
+                    <p class="text-muted small mb-0">Explora todos nuestros platos marinos, criollos, bebidas y coctelería.</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('publico.pedir') }}" class="boton-cliente boton-cliente--rojo py-2 px-3">
+                        <i class="bi bi-bag-check-fill me-1"></i> Hacer pedido para recojo
+                    </a>
+                </div>
+            </div>
+        </div>
 
-    <!-- Secciones por categoría -->
-    {% for cat in carta %}
-        <div class="mb-5" id="cat-{{ cat.categoria_id }}">
-            <div class="d-flex align-items-center mb-3 border-bottom pb-2">
-                <h3 class="fw-bold text-dark mb-0 me-3">{{ cat.nombre }}</h3>
-                <span class="badge bg-secondary rounded-pill">{{ cat.platos | length }} opciones</span>
+        {% if not carta %}
+            <div class="alert alert-info text-center py-4">
+                <i class="bi bi-info-circle display-4 d-block mb-2"></i>
+                Estamos actualizando nuestra carta. Por favor, vuelve a visitarnos en unos momentos.
+            </div>
+        {% else %}
+            <!-- Barra pegajosa de categorías (chips con scroll lateral) -->
+            <div class="barra-categorias-sticky">
+                <div class="scroll-categorias" role="tablist" aria-label="Categorías de la carta">
+                    {% for grupo in carta %}
+                    <button type="button" class="chip-categoria {% if loop.first %}activo{% endif %}"
+                            data-target-cat="cat-pub-collapse-{{ grupo.categoria_id }}"
+                            id="chip-pub-cat-{{ grupo.categoria_id }}" role="tab">
+                        {{ grupo.nombre }}
+                    </button>
+                    {% endfor %}
+                </div>
             </div>
 
-            <div class="row g-3">
-                {% for p in cat.platos %}
-                    <div class="col-12 col-md-6 col-lg-4">
-                        <div class="card h-100 shadow-sm border-0 {{ 'plato-agotado bg-light' if not p.disponible else '' }}">
-                            <div class="card-body d-flex flex-column justify-content-between p-3">
-                                <div>
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h5 class="card-title fw-bold text-dark mb-0">
-                                            {% if p.codigo %}
-                                                <span class="badge bg-warning-subtle text-dark border border-warning me-1">#{{ p.codigo }}</span>
-                                            {% endif %}
-                                            {{ p.nombre }}
-                                        </h5>
-                                        <span class="fs-5 fw-bold text-danger ms-2 text-nowrap">
-                                            S/ {{ "%.2f"|format(p.precio) }}
-                                        </span>
+            <!-- Acordeón de categorías y platos solo lectura -->
+            <div class="accordion acordeon-carta mb-5" id="acordeonCartaPublica">
+                {% for grupo in carta %}
+                <div class="accordion-item item-categoria-wrapper" id="cat-pub-wrapper-{{ grupo.categoria_id }}">
+                    <h2 class="accordion-header" id="heading-pub-{{ grupo.categoria_id }}">
+                        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#cat-pub-collapse-{{ grupo.categoria_id }}"
+                                aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                                aria-controls="cat-pub-collapse-{{ grupo.categoria_id }}">
+                            <span class="me-auto">{{ grupo.nombre }}</span>
+                            <span class="badge rounded-pill bg-light text-dark border me-2 small">{{ grupo.platos | length }}</span>
+                        </button>
+                    </h2>
+                    <div id="cat-pub-collapse-{{ grupo.categoria_id }}"
+                         class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                         aria-labelledby="heading-pub-{{ grupo.categoria_id }}"
+                         data-bs-parent="#acordeonCartaPublica">
+                        <div class="accordion-body p-0">
+                            <div class="lista-platos-grupo">
+                                {% for plato in grupo.platos %}
+                                <div class="plato-tarjeta fila-plato {% if not plato.disponible %}plato-agotado{% endif %}">
+                                    
+                                    <!-- Espacio para imagen (Fase 3.9) con placeholder neutro -->
+                                    <div class="plato-img-box" aria-hidden="true">
+                                        {% if 'bebida' in grupo.nombre|lower or 'jugo' in grupo.nombre|lower or 'coctel' in grupo.nombre|lower or 'cerveza' in grupo.nombre|lower %}
+                                            <i class="bi bi-cup-straw"></i>
+                                        {% else %}
+                                            <i class="bi bi-egg-fried"></i>
+                                        {% endif %}
                                     </div>
-                                    {% if p.descripcion %}
-                                        <p class="card-text text-muted small mb-2">{{ p.descripcion }}</p>
-                                    {% endif %}
-                                </div>
 
-                                <div class="mt-2 text-end">
-                                    {% if not p.disponible %}
-                                        <span class="badge bg-danger badge-agotado py-1 px-2">
-                                            <i class="bi bi-exclamation-circle me-1"></i> Agotado por hoy
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle py-1 px-2">
-                                            <i class="bi bi-check2 me-1"></i> Disponible
-                                        </span>
-                                    {% endif %}
+                                    <!-- Información del plato -->
+                                    <div class="plato-info">
+                                        <div class="plato-titulo">
+                                            {{ plato.nombre }}
+                                            {% if plato.codigo %}
+                                                <span class="badge bg-dark-subtle text-dark border ms-1 small">#{{ plato.codigo }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if plato.descripcion %}
+                                            <div class="plato-desc">{{ plato.descripcion }}</div>
+                                        {% endif %}
+                                        <div class="plato-precio">S/ {{ '%.2f'|format(plato.precio|float) }}</div>
+                                    </div>
+
+                                    <!-- Estado disponible / agotado -->
+                                    <div class="plato-accion ms-2">
+                                        {% if not plato.disponible %}
+                                            <span class="badge bg-danger badge-agotado">Agotado</span>
+                                        {% else %}
+                                            <a href="{{ url_for('publico.pedir') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 fw-semibold">
+                                                Pedir
+                                            </a>
+                                        {% endif %}
+                                    </div>
                                 </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
+                </div>
                 {% endfor %}
             </div>
-        </div>
-    {% endfor %}
-{% endif %}
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const chips = document.querySelectorAll('.chip-categoria');
+    chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            chips.forEach(c => c.classList.remove('activo'));
+            chip.classList.add('activo');
+
+            const targetId = chip.dataset.targetCat;
+            const collapseEl = document.getElementById(targetId);
+            if (collapseEl) {
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false });
+                bsCollapse.show();
+
+                const wrapper = collapseEl.closest('.item-categoria-wrapper');
+                if (wrapper) {
+                    const offset = 140;
+                    const bodyRect = document.body.getBoundingClientRect().top;
+                    const elementRect = wrapper.getBoundingClientRect().top;
+                    const elementPosition = elementRect - bodyRect;
+                    const offsetPosition = elementPosition - offset;
+
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

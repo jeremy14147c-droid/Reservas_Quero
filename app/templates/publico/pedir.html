@@ -4,147 +4,586 @@
 
 {% block contenido %}
 <div class="row justify-content-center">
-    <div class="col-12 col-lg-9">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-dark text-white">
-                <h4 class="fw-bold mb-0"><i class="bi bi-bag-check me-2 text-warning"></i>Pedido para recojo</h4>
-                <small class="text-white-50">{{ config.nombre_local }}</small>
+    <div class="col-12 col-lg-8">
+
+        <!-- Encabezado de la página -->
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <div>
+                <h1 class="h3 fw-bold mb-1 text-danger">
+                    <i class="bi bi-bag-check me-2"></i>Pedido para recojo
+                </h1>
+                <p class="text-muted small mb-0">Selecciona tus platos favoritos y recógelos listos en el local.</p>
             </div>
-            <div class="card-body p-4">
+            {% if not config.abierto %}
+                <span class="badge text-bg-warning p-2">
+                    <i class="bi bi-clock-history me-1"></i> Local cerrado · El staff lo revisará al abrir
+                </span>
+            {% endif %}
+        </div>
 
-                {% if not config.abierto %}
-                    <div class="alert alert-warning">
-                        <i class="bi bi-clock-history me-1"></i> El local está cerrado; puedes enviar tu pedido
-                        y el personal lo revisará al abrir.
-                    </div>
-                {% endif %}
-
-                <form method="POST" action="{{ url_for('publico.pedir') }}" id="form-pedido" novalidate>
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <!-- Campo trampa (honeypot): invisible para personas -->
-                    <input type="text" name="pagina_web" class="d-none" tabindex="-1" autocomplete="off">
-                    <!-- Las líneas del pedido llegan aquí en JSON -->
-                    <input type="hidden" name="items" id="items-json" value="[]">
-
-                    <!-- Platos: lista por categoría con selector de cantidad -->
-                    <label class="form-label fw-semibold">1. Elige tus platos</label>
-                    {% for grupo in carta %}
-                        <h6 class="mt-3 text-secondary border-bottom pb-1">{{ grupo.nombre }}</h6>
-                        {% for plato in grupo.platos %}
-                            <div class="d-flex align-items-center justify-content-between py-1">
-                                <div>
-                                    <strong>{{ plato.nombre }}</strong>
-                                    {% if plato.codigo %}<span class="badge bg-secondary badge-nro">N° {{ plato.codigo }}</span>{% endif %}
-                                    <span class="ms-2 text-nowrap">S/ {{ '%.2f'|format(plato.precio|float) }}</span>
-                                    {% if plato.descripcion %}<div class="small text-muted">{{ plato.descripcion }}</div>{% endif %}
-                                </div>
-                                {% if plato.disponible %}
-                                    <div class="input-group input-cant" style="max-width: 130px;">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm btn-restar"
-                                                data-plato="{{ plato.plato_id }}">−</button>
-                                        <input type="number" class="form-control form-control-sm text-center cant-plato"
-                                               id="cant-{{ plato.plato_id }}" value="0" min="0" max="99"
-                                               data-plato="{{ plato.plato_id }}"
-                                               data-precio="{{ '%.2f'|format(plato.precio|float) }}"
-                                               data-nombre="{{ plato.nombre }}" inputmode="numeric">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm btn-sumar"
-                                                data-plato="{{ plato.plato_id }}">+</button>
-                                    </div>
-                                {% else %}
-                                    <span class="badge bg-danger">Agotado</span>
-                                {% endif %}
-                            </div>
-                        {% endfor %}
-                    {% endfor %}
-
-                    <!-- Resumen del carrito (solo lo que el cliente ve; en el servidor se recalcula) -->
-                    <div class="alert alert-secondary mt-3 mb-3">
-                        <div class="d-flex justify-content-between">
-                            <span>Platos: <strong id="conteo-platos">0</strong></span>
-                            <span>Total estimado: <strong>S/ <span id="total-estimado">0.00</span></strong></span>
-                        </div>
-                        <div class="form-text mb-0">El total lo confirma el personal al aceptar tu pedido.</div>
-                    </div>
-
-                    <!-- Datos del cliente -->
-                    <label class="form-label fw-semibold">2. Sus datos</label>
-                    <div class="mb-3">
-                        <input type="text" class="form-control" id="nombre" name="nombre" maxlength="100"
-                               placeholder="Nombre de quien recoge *" required>
-                    </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-md-6">
-                            <input type="tel" class="form-control" id="telefono" name="telefono"
-                                   inputmode="numeric" pattern="9[0-9]{8}" maxlength="9" placeholder="Teléfono 9... *"
-                                   required>
-                            <div class="form-text">Le avisaremos aquí cuando su pedido esté listo.</div>
-                        </div>
-                        <div class="col-md-6">
-                            <input type="email" class="form-control" id="correo" name="correo" maxlength="120"
-                                   placeholder="Correo (opcional)">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <textarea class="form-control" id="nota" name="nota" maxlength="300" rows="2"
-                                  placeholder="Nota para el restaurante (opcional, ej. sin ají)"></textarea>
-                    </div>
-
-                    <div class="form-check mb-4">
-                        <input class="form-check-input" type="checkbox" id="acepta_datos" name="acepta_datos" value="si" required>
-                        <label class="form-check-label small" for="acepta_datos">
-                            Autorizo el uso de mis datos solo para gestionar este pedido.
-                            <span class="text-danger">*</span>
-                        </label>
-                    </div>
-
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-warning btn-lg fw-bold shadow-sm">
-                            <i class="bi bi-send me-1"></i> Enviar pedido
-                        </button>
-                    </div>
-                    <p class="text-muted small text-center mt-3 mb-0">
-                        Tu pedido queda <strong>pendiente</strong>: el personal lo revisa y le indica cómo pagar
-                        (Yape/Plin) cuando lo acepta.
-                    </p>
-                </form>
+        <!-- Buscador por nombre o número de plato -->
+        <div class="card shadow-sm border-0 mb-3 bg-white">
+            <div class="card-body p-2">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-0 text-muted"><i class="bi bi-search"></i></span>
+                    <input type="text" id="buscador-plato" class="form-control border-0 shadow-none ps-0"
+                           placeholder="Buscar plato o número (ej. ceviche, 1)..." aria-label="Buscar plato por nombre o número">
+                    <button class="btn btn-link text-muted d-none" type="button" id="btn-limpiar-filtro" aria-label="Limpiar búsqueda">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                </div>
             </div>
         </div>
+
+        <!-- Barra pegajosa de categorías (chips con scroll lateral) -->
+        <div class="barra-categorias-sticky">
+            <div class="scroll-categorias" id="chips-categorias" role="tablist" aria-label="Categorías de la carta">
+                {% for grupo in carta %}
+                <button type="button" class="chip-categoria {% if loop.first %}activo{% endif %}"
+                        data-target-cat="cat-collapse-{{ grupo.categoria_id }}"
+                        id="chip-cat-{{ grupo.categoria_id }}" role="tab">
+                    {{ grupo.nombre }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Acordeón de categorías y platos -->
+        <div class="accordion acordeon-carta mb-5" id="acordeonCarta">
+            {% for grupo in carta %}
+            <div class="accordion-item item-categoria-wrapper" id="cat-wrapper-{{ grupo.categoria_id }}">
+                <h2 class="accordion-header" id="heading-{{ grupo.categoria_id }}">
+                    <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#cat-collapse-{{ grupo.categoria_id }}"
+                            aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                            aria-controls="cat-collapse-{{ grupo.categoria_id }}">
+                        <span class="me-auto">{{ grupo.nombre }}</span>
+                        <span class="badge rounded-pill bg-light text-dark border me-2 small">{{ grupo.platos | length }}</span>
+                    </button>
+                </h2>
+                <div id="cat-collapse-{{ grupo.categoria_id }}"
+                     class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                     aria-labelledby="heading-{{ grupo.categoria_id }}"
+                     data-bs-parent="#acordeonCarta">
+                    <div class="accordion-body p-0">
+                        <div class="lista-platos-grupo">
+                            {% for plato in grupo.platos %}
+                            <div class="plato-tarjeta fila-plato {% if not plato.disponible %}plato-agotado{% endif %}"
+                                 id="tarjeta-plato-{{ plato.plato_id }}"
+                                 data-id="{{ plato.plato_id }}"
+                                 data-nombre="{{ plato.nombre }}"
+                                 data-codigo="{{ plato.codigo or '' }}"
+                                 data-precio="{{ '%.2f'|format(plato.precio|float) }}">
+                                
+                                <!-- Espacio para imagen (Fase 3.9) con placeholder neutro -->
+                                <div class="plato-img-box" aria-hidden="true">
+                                    {% if 'bebida' in grupo.nombre|lower or 'jugo' in grupo.nombre|lower or 'coctel' in grupo.nombre|lower or 'cerveza' in grupo.nombre|lower %}
+                                        <i class="bi bi-cup-straw"></i>
+                                    {% else %}
+                                        <i class="bi bi-egg-fried"></i>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Información del plato -->
+                                <div class="plato-info">
+                                    <div class="plato-titulo">
+                                        {{ plato.nombre }}
+                                        {% if plato.codigo %}
+                                            <span class="badge bg-dark-subtle text-dark border ms-1 small">#{{ plato.codigo }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if plato.descripcion %}
+                                        <div class="plato-desc">{{ plato.descripcion }}</div>
+                                    {% endif %}
+                                    <div class="plato-precio">S/ {{ '%.2f'|format(plato.precio|float) }}</div>
+                                </div>
+
+                                <!-- Control + / - o aviso de agotado -->
+                                <div class="plato-accion ms-2">
+                                    {% if plato.disponible %}
+                                        <div class="control-cantidad" role="group" aria-label="Cantidad para {{ plato.nombre }}">
+                                            <button type="button" class="btn-cant btn-restar-cant"
+                                                    data-id="{{ plato.plato_id }}" aria-label="Restar una unidad">
+                                                <i class="bi bi-dash"></i>
+                                            </button>
+                                            <span class="valor-cant" id="cant-vista-{{ plato.plato_id }}">0</span>
+                                            <button type="button" class="btn-cant btn-sumar-cant"
+                                                    data-id="{{ plato.plato_id }}" aria-label="Sumar una unidad">
+                                                <i class="bi bi-plus"></i>
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis border px-2 py-1">Agotado</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</div>
+
+<!-- Barra flotante inferior de pedido -->
+<div class="barra-carrito-flotante oculto" id="barra-carrito">
+    <button type="button" class="btn-ver-pedido shadow" data-bs-toggle="offcanvas" data-bs-target="#offcanvasPedido" aria-controls="offcanvasPedido">
+        <span>
+            <i class="bi bi-bag-fill me-2"></i>
+            <span id="barra-conteo">0 platos</span>
+        </span>
+        <span class="fw-bold">
+            Ver pedido &bull; S/ <span id="barra-total">0.00</span>
+            <i class="bi bi-chevron-up ms-1"></i>
+        </span>
+    </button>
+</div>
+
+<!-- Panel Lateral / Offcanvas del Pedido -->
+<div class="offcanvas offcanvas-bottom offcanvas-md-end offcanvas-pedido" tabindex="-1" id="offcanvasPedido" aria-labelledby="offcanvasPedidoLabel" style="min-height: 85vh;">
+    <div class="offcanvas-header bg-dark text-white py-3">
+        <h5 class="offcanvas-title fw-bold" id="offcanvasPedidoLabel">
+            <i class="bi bi-bag-check-fill text-warning me-2"></i>Tu Pedido para Recojo
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar pedido"></button>
+    </div>
+    <div class="offcanvas-body p-3 p-md-4">
+        
+        <form method="POST" action="{{ url_for('publico.pedir') }}" id="form-pedido-final" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <!-- Campo trampa (honeypot) anti bots -->
+            <input type="text" name="pagina_web" class="d-none" tabindex="-1" autocomplete="off">
+            <!-- JSON con los platos seleccionados -->
+            <input type="hidden" name="items" id="items-json-input" value="[]">
+
+            <!-- Lista de platos seleccionados -->
+            <div class="mb-3">
+                <h6 class="fw-bold text-dark border-bottom pb-2">
+                    <i class="bi bi-list-check me-1 text-danger"></i> Platos en tu pedido
+                </h6>
+                <div id="lista-items-carrito" class="my-2">
+                    <!-- Filas inyectadas por JS -->
+                    <div class="text-muted text-center py-3" id="carrito-vacio-aviso">
+                        Aún no has agregado ningún plato a tu pedido.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bloque: Complementa tu pedido (Fase 3.5) -->
+            {% if complementos and complementos | length > 0 %}
+            <div class="bloque-complementos" id="bloque-complementos-seccion">
+                <div class="fw-bold text-dark small d-flex align-items-center">
+                    <i class="bi bi-stars text-warning me-2 fs-6"></i>
+                    <span>¿Deseas complementar tu pedido?</span>
+                </div>
+                <p class="text-muted small mb-2">Bebidas, guarniciones o piqueos recomendados:</p>
+                <div class="d-flex flex-column gap-1">
+                    {% for comp in complementos %}
+                    <div class="tarjeta-complemento">
+                        <div>
+                            <div class="fw-bold small text-dark">{{ comp.nombre }}</div>
+                            <div class="text-danger small fw-semibold">S/ {{ '%.2f'|format(comp.precio|float) }}</div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-agregar-complemento py-0 px-2 fw-bold"
+                                data-id="{{ comp.plato_id }}"
+                                data-nombre="{{ comp.nombre }}"
+                                data-precio="{{ '%.2f'|format(comp.precio|float) }}">
+                            <i class="bi bi-plus"></i> Agregar
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Nota especial -->
+            <div class="mb-3">
+                <label for="input-nota" class="form-label small fw-semibold text-muted">Instrucciones o nota para la cocina (opcional):</label>
+                <textarea class="form-control form-control-sm" id="input-nota" name="nota" rows="2"
+                          maxlength="300" placeholder="Ej. sin cebolla, cremas aparte, bien cocido..."></textarea>
+            </div>
+
+            <!-- Resumen de totales -->
+            <div class="p-3 bg-white rounded-3 border mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="text-muted">Total estimado:</span>
+                    <span class="fs-4 fw-bold text-danger">S/ <span id="carrito-total-precio">0.00</span></span>
+                </div>
+                <div class="small text-muted">
+                    <i class="bi bi-info-circle me-1"></i>El staff revisará y confirmará el monto exacto al aceptar el pedido.
+                </div>
+            </div>
+
+            <!-- Datos del cliente -->
+            <div class="card border-0 bg-white p-3 rounded-3 shadow-sm mb-4">
+                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                    <i class="bi bi-person-fill text-danger me-1"></i> Datos para entrega
+                </h6>
+
+                <div class="mb-2">
+                    <label for="cliente-nombre" class="form-label small fw-semibold">Nombre y Apellido *</label>
+                    <input type="text" class="form-control" id="cliente-nombre" name="nombre" maxlength="100"
+                           placeholder="¿A nombre de quién estará el pedido?" required>
+                </div>
+
+                <div class="mb-2">
+                    <label for="cliente-telefono" class="form-label small fw-semibold">Celular (9 dígitos) *</label>
+                    <input type="tel" class="form-control" id="cliente-telefono" name="telefono"
+                           inputmode="numeric" pattern="9[0-9]{8}" maxlength="9" placeholder="987654321" required>
+                    <div class="form-text small">Le escribiremos por WhatsApp cuando el pedido esté listo.</div>
+                </div>
+
+                <div class="mb-2">
+                    <label for="cliente-correo" class="form-label small fw-semibold">Correo electrónico (opcional)</label>
+                    <input type="email" class="form-control" id="cliente-correo" name="correo" maxlength="120"
+                           placeholder="cliente@ejemplo.com">
+                </div>
+
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="cliente-acepta-datos" name="acepta_datos" value="si" required>
+                    <label class="form-check-label small text-muted" for="cliente-acepta-datos">
+                        Autorizo el uso de mis datos exclusivamente para la atención de este pedido. <span class="text-danger">*</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="d-grid mb-3">
+                <button type="submit" class="btn btn-danger btn-lg fw-bold shadow py-3" id="btn-enviar-pedido" data-requiere-conexion>
+                    <i class="bi bi-send-fill me-2"></i> Confirmar y Enviar Pedido
+                </button>
+            </div>
+            <p class="text-center text-muted small mb-0">
+                Al enviar, tu pedido queda <strong>pendiente</strong>. El personal lo acepta y te muestra las instrucciones de pago (Yape/Plin).
+            </p>
+        </form>
+
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    /* Carrito simple: cantidades por plato -> items JSON + total estimado.
-       El servidor SIEMPRE recalcula el total con el precio real del plato. */
-    const contadores = {};
+document.addEventListener('DOMContentLoaded', () => {
+    // -------------------------------------------------------------
+    // ESTADO DEL CARRITO (sincronizado con sessionStorage)
+    // Estructura: { [plato_id]: { id, nombre, precio, cantidad } }
+    // -------------------------------------------------------------
+    const CLAVE_STORAGE = 'quero_carrito_v1';
+    let carrito = {};
 
-    function recalcular() {
-        let cantidad_total = 0, total = 0;
-        const items = [];
-        document.querySelectorAll('.cant-plato').forEach(inp => {
-            const cant = parseInt(inp.value, 10) || 0;
-            if (cant > 0) {
-                cantidad_total += cant;
-                total += cant * parseFloat(inp.dataset.precio);
-                items.push({ plato_id: parseInt(inp.dataset.plato, 10), cantidad: cant });
+    function cargarCarritoStorage() {
+        try {
+            const raw = sessionStorage.getItem(CLAVE_STORAGE);
+            if (raw) {
+                carrito = JSON.parse(raw) || {};
             }
-        });
-        document.getElementById('conteo-platos').textContent = cantidad_total;
-        document.getElementById('total-estimado').textContent = total.toFixed(2);
-        document.getElementById('items-json').value = JSON.stringify(items);
+        } catch (e) {
+            carrito = {};
+        }
     }
 
-    document.querySelectorAll('.btn-sumar').forEach(b => b.addEventListener('click', () => {
-        const inp = document.getElementById('cant-' + b.dataset.plato);
-        inp.value = Math.min(99, (parseInt(inp.value, 10) || 0) + 1);
-        recalcular();
-    }));
-    document.querySelectorAll('.btn-restar').forEach(b => b.addEventListener('click', () => {
-        const inp = document.getElementById('cant-' + b.dataset.plato);
-        inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) - 1);
-        recalcular();
-    }));
-    document.querySelectorAll('.cant-plato').forEach(inp => inp.addEventListener('input', recalcular));
+    function guardarCarritoStorage() {
+        try {
+            sessionStorage.setItem(CLAVE_STORAGE, JSON.stringify(carrito));
+        } catch (e) {}
+    }
+
+    function limpiarCarritoStorage() {
+        try {
+            sessionStorage.removeItem(CLAVE_STORAGE);
+        } catch (e) {}
+    }
+
+    // Inicializar
+    cargarCarritoStorage();
+
+    // -------------------------------------------------------------
+    // ACTUALIZACIÓN DE INTERFAZ Y CÁLCULOS
+    // -------------------------------------------------------------
+    const barraCarrito = document.getElementById('barra-carrito');
+    const barraConteo = document.getElementById('barra-conteo');
+    const barraTotal = document.getElementById('barra-total');
+    const listaCarrito = document.getElementById('lista-items-carrito');
+    const carritoTotalPrecio = document.getElementById('carrito-total-precio');
+    const itemsJsonInput = document.getElementById('items-json-input');
+    const btnEnviarPedido = document.getElementById('btn-enviar-pedido');
+
+    function actualizarInterfaz() {
+        let totalPlatos = 0;
+        let totalMonto = 0;
+        const itemsArray = [];
+
+        // 1. Sincronizar contadores en la lista de platos
+        document.querySelectorAll('.fila-plato').forEach(fila => {
+            const id = parseInt(fila.dataset.id, 10);
+            const cantVista = document.getElementById(`cant-vista-${id}`);
+            if (cantVista) {
+                const cant = carrito[id] ? carrito[id].cantidad : 0;
+                cantVista.textContent = cant;
+            }
+        });
+
+        // 2. Calcular totales y preparar items para el backend
+        const ids = Object.keys(carrito);
+        if (ids.length === 0) {
+            barraCarrito.classList.add('oculto');
+            listaCarrito.innerHTML = '<div class="text-muted text-center py-3">Aún no has agregado ningún plato a tu pedido.</div>';
+            carritoTotalPrecio.textContent = '0.00';
+            barraTotal.textContent = '0.00';
+            barraConteo.textContent = '0 platos';
+            itemsJsonInput.value = '[]';
+            if (btnEnviarPedido) btnEnviarPedido.disabled = true;
+            guardarCarritoStorage();
+            return;
+        }
+
+        if (btnEnviarPedido) btnEnviarPedido.disabled = false;
+        barraCarrito.classList.remove('oculto');
+
+        let htmlItems = '';
+        ids.forEach(idStr => {
+            const item = carrito[idStr];
+            if (item && item.cantidad > 0) {
+                totalPlatos += item.cantidad;
+                const subtotal = item.cantidad * item.precio;
+                totalMonto += subtotal;
+                itemsArray.push({ plato_id: item.id, cantidad: item.cantidad });
+
+                htmlItems += `
+                <div class="item-carrito-fila">
+                    <div style="flex: 1; padding-right: 0.5rem;">
+                        <div class="fw-bold text-dark small">${item.nombre}</div>
+                        <div class="text-danger small fw-semibold">S/ ${subtotal.toFixed(2)} <span class="text-muted fw-normal">(${item.cantidad} &times; S/ ${item.precio.toFixed(2)})</span></div>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <div class="control-cantidad" role="group">
+                            <button type="button" class="btn-cant btn-cart-restar" data-id="${item.id}" aria-label="Restar">-</button>
+                            <span class="valor-cant">${item.cantidad}</span>
+                            <button type="button" class="btn-cant btn-cart-sumar" data-id="${item.id}" aria-label="Sumar">+</button>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-link text-muted p-1 ms-1 btn-cart-quitar" data-id="${item.id}" title="Quitar plato" aria-label="Quitar ${item.nombre}">
+                            <i class="bi bi-trash3 text-danger"></i>
+                        </button>
+                    </div>
+                </div>`;
+            }
+        });
+
+        listaCarrito.innerHTML = htmlItems;
+        barraConteo.textContent = `${totalPlatos} ${totalPlatos === 1 ? 'plato' : 'platos'}`;
+        barraTotal.textContent = totalMonto.toFixed(2);
+        carritoTotalPrecio.textContent = totalMonto.toFixed(2);
+        itemsJsonInput.value = JSON.stringify(itemsArray);
+
+        guardarCarritoStorage();
+    }
+
+    // -------------------------------------------------------------
+    // ACCIONES DE SUMAR, RESTAR Y QUITAR PLATOS
+    // -------------------------------------------------------------
+    function modificarCantidad(id, delta, platoInfo) {
+        id = parseInt(id, 10);
+        if (!carrito[id]) {
+            if (delta <= 0) return;
+            carrito[id] = {
+                id: id,
+                nombre: platoInfo.nombre,
+                precio: parseFloat(platoInfo.precio),
+                cantidad: 0
+            };
+        }
+        carrito[id].cantidad = Math.max(0, carrito[id].cantidad + delta);
+        if (carrito[id].cantidad === 0) {
+            delete carrito[id];
+        }
+        actualizarInterfaz();
+    }
+
+    // Botones + y - en la lista principal
+    document.querySelectorAll('.btn-sumar-cant').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.id;
+            const tarjeta = document.getElementById(`tarjeta-plato-${id}`);
+            modificarCantidad(id, 1, {
+                nombre: tarjeta.dataset.nombre,
+                precio: tarjeta.dataset.precio
+            });
+        });
+    });
+
+    document.querySelectorAll('.btn-restar-cant').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.id;
+            const tarjeta = document.getElementById(`tarjeta-plato-${id}`);
+            modificarCantidad(id, -1, {
+                nombre: tarjeta ? tarjeta.dataset.nombre : '',
+                precio: tarjeta ? tarjeta.dataset.precio : 0
+            });
+        });
+    });
+
+    // Delegación para botones dentro del offcanvas
+    listaCarrito.addEventListener('click', e => {
+        const btnSumar = e.target.closest('.btn-cart-sumar');
+        if (btnSumar) {
+            const id = btnSumar.dataset.id;
+            if (carrito[id]) modificarCantidad(id, 1, carrito[id]);
+            return;
+        }
+        const btnRestar = e.target.closest('.btn-cart-restar');
+        if (btnRestar) {
+            const id = btnRestar.dataset.id;
+            if (carrito[id]) modificarCantidad(id, -1, carrito[id]);
+            return;
+        }
+        const btnQuitar = e.target.closest('.btn-cart-quitar');
+        if (btnQuitar) {
+            const id = btnQuitar.dataset.id;
+            if (carrito[id]) {
+                delete carrito[id];
+                actualizarInterfaz();
+            }
+        }
+    });
+
+    // Agregar plato desde el bloque de complementos
+    document.querySelectorAll('.btn-agregar-complemento').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.id;
+            modificarCantidad(id, 1, {
+                nombre: btn.dataset.nombre,
+                precio: btn.dataset.precio
+            });
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Agregado';
+            btn.classList.replace('btn-outline-danger', 'btn-success');
+            setTimeout(() => {
+                btn.innerHTML = '<i class="bi bi-plus"></i> Agregar';
+                btn.classList.replace('btn-success', 'btn-outline-danger');
+            }, 1200);
+        });
+    });
+
+    // -------------------------------------------------------------
+    // CHIPS DE CATEGORÍA Y NAVEGACIÓN EN ACORDEÓN
+    // -------------------------------------------------------------
+    const chips = document.querySelectorAll('.chip-categoria');
+    chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            chips.forEach(c => c.classList.remove('activo'));
+            chip.classList.add('activo');
+
+            const targetId = chip.dataset.targetCat;
+            const collapseEl = document.getElementById(targetId);
+            if (collapseEl) {
+                // Abrir el collapse si estaba cerrado
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false });
+                bsCollapse.show();
+
+                // Desplazar hacia la categoría suavemente
+                const wrapper = collapseEl.closest('.item-categoria-wrapper');
+                if (wrapper) {
+                    const offset = 140; // cabecera + barra sticky
+                    const bodyRect = document.body.getBoundingClientRect().top;
+                    const elementRect = wrapper.getBoundingClientRect().top;
+                    const elementPosition = elementRect - bodyRect;
+                    const offsetPosition = elementPosition - offset;
+
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        });
+    });
+
+    // -------------------------------------------------------------
+    // BUSCADOR EN TIEMPO REAL (Nombre o número exacto sin tildes)
+    // -------------------------------------------------------------
+    const buscador = document.getElementById('buscador-plato');
+    const btnLimpiar = document.getElementById('btn-limpiar-filtro');
+
+    function normalizar(texto) {
+        return (texto || '')
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
+    }
+
+    function filtrarPlatos() {
+        const termino = normalizar(buscador.value);
+        if (termino.length > 0) {
+            btnLimpiar.classList.remove('d-none');
+        } else {
+            btnLimpiar.classList.add('d-none');
+        }
+
+        const esDigitos = /^\d+$/.test(termino);
+
+        document.querySelectorAll('.item-categoria-wrapper').forEach(catWrapper => {
+            let platosVisiblesEnCat = 0;
+            catWrapper.querySelectorAll('.fila-plato').forEach(fila => {
+                const nombrePlato = normalizar(fila.dataset.nombre);
+                const codigoPlato = fila.dataset.codigo.trim();
+
+                let coincide = false;
+                if (!termino) {
+                    coincide = true;
+                } else if (esDigitos) {
+                    // Si el usuario escribe números: coincidencia EXACTA por código
+                    coincide = (codigoPlato === termino);
+                } else {
+                    // Si escribe texto: búsqueda insensible a mayúsculas y tildes
+                    coincide = nombrePlato.includes(termino);
+                }
+
+                if (coincide) {
+                    fila.style.display = 'flex';
+                    platosVisiblesEnCat++;
+                } else {
+                    fila.style.display = 'none';
+                }
+            });
+
+            // Si hay filtro activo y la categoría tiene platos coincidentes, abrirla
+            const collapseEl = catWrapper.querySelector('.accordion-collapse');
+            if (termino && platosVisiblesEnCat > 0) {
+                catWrapper.style.display = '';
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false });
+                bsCollapse.show();
+            } else if (termino && platosVisiblesEnCat === 0) {
+                catWrapper.style.display = 'none';
+            } else {
+                catWrapper.style.display = '';
+            }
+        });
+    }
+
+    buscador.addEventListener('input', filtrarPlatos);
+    btnLimpiar.addEventListener('click', () => {
+        buscador.value = '';
+        filtrarPlatos();
+        buscador.focus();
+    });
+
+    // -------------------------------------------------------------
+    // LIMPIAR STORAGE TRAS ENVÍO EXITOSO
+    // -------------------------------------------------------------
+    const formFinal = document.getElementById('form-pedido-final');
+    formFinal.addEventListener('submit', () => {
+        // Al enviar el formulario válido, limpiamos el storage
+        if (formFinal.checkValidity()) {
+            limpiarCarritoStorage();
+        }
+    });
+
+    // Render inicial
+    actualizarInterfaz();
+});
 </script>
 {% endblock %}

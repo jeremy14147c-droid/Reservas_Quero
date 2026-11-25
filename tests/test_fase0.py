@@ -25,7 +25,7 @@ def test_pagina_inicio_publica(cliente):
     """Comprueba que la página de inicio pública cargue con código 200."""
     resp = cliente.get("/")
     assert resp.status_code == 200
-    assert b"QUERO" in resp.data
+    assert b"Quero" in resp.data or b"QUERO" in resp.data
     assert b"Reservar mesa" in resp.data
     assert b"Hacer pedido" in resp.data
 

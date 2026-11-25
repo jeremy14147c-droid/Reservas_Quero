@@ -24,6 +24,9 @@
 
     {% if usuario_actual.es_admin() %}
     <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalGestionCategorias">
+            <i class="bi bi-tags me-1"></i> Categorías
+        </button>
         <button class="btn btn-outline-dark btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalCategoria">
             <i class="bi bi-folder-plus me-1"></i> Nueva Categoría
         </button>
@@ -274,12 +277,77 @@
                         <input type="number" class="form-control" id="cat_orden" name="orden" value="0">
                         <small class="text-muted">Las categorías con menor número aparecen primero en la carta.</small>
                     </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="cat_es_complemento" name="es_complemento" value="1">
+                        <label class="form-check-label fw-semibold" for="cat_es_complemento">
+                            <i class="bi bi-stars text-warning me-1"></i> Sugerir como complemento al pedir
+                        </label>
+                        <div class="form-text small">Los platos de esta categoría se sugerirán en el carrito ("Complementa tu pedido", ej. bebidas, postres, piqueos).</div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-dark fw-bold" data-requiere-conexion>Crear Categoría</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Gestión de Categorías y Complementos -->
+<div class="modal fade" id="modalGestionCategorias" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-tags me-2"></i> Gestión de Categorías y Complementos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 bg-light border-bottom">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Marca con <strong>Sugerir</strong> las categorías que deseas que aparezcan en el bloque <em>"Complementa tu pedido"</em> (ej. Bebidas, Postres, Piqueos) cuando el cliente agregue platos al carrito.
+                    </small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 70px;">Orden</th>
+                                <th>Nombre</th>
+                                <th class="text-center" style="width: 180px;">¿Es Complemento?</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in categorias %}
+                            <tr>
+                                <td><span class="badge bg-secondary">{{ c.orden }}</span></td>
+                                <td class="fw-semibold">{{ c.nombre }}</td>
+                                <td class="text-center">
+                                    <form method="POST" action="{{ url_for('carta.cambiar_complemento', categoria_id=c.categoria_id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        {% if c.es_complemento %}
+                                            <input type="hidden" name="es_complemento" value="0">
+                                            <button type="submit" class="btn btn-sm btn-warning fw-semibold shadow-sm" data-requiere-conexion title="Quitar de sugeridos">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Sugerido
+                                            </button>
+                                        {% else %}
+                                            <input type="hidden" name="es_complemento" value="1">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" data-requiere-conexion title="Marcar como sugerido">
+                                                <i class="bi bi-plus-circle me-1"></i> No sugerido
+                                            </button>
+                                        {% endif %}
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
         </div>
     </div>
 </div>

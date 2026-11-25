@@ -112,6 +112,7 @@ def pedir():
     """
     config = _config_basica()
     carta_datos = servicio_carta.obtener_carta_publica()
+    complementos = servicio_carta.obtener_platos_complementarios(limite=3)
 
     if request.method == "POST":
         # Campo trampa (honeypot) anti bots
@@ -141,7 +142,7 @@ def pedir():
             except ValueError as error:
                 flash(str(error), "danger")
 
-    return render_template("publico/pedir.html", config=config, carta=carta_datos)
+    return render_template("publico/pedir.html", config=config, carta=carta_datos, complementos=complementos)
 
 
 @publico_bp.route("/pedido/<uuid:token>")
