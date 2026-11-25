@@ -75,9 +75,14 @@ def test_post_pedir_rechaza_plato_agotado(cliente, app):
     assert b"agotado" in resp.data.lower() or b"no est\xc3\xa1 disponible" in resp.data.lower()
 
 
-def test_admin_puede_cambiar_categoria_complemento(cliente, app):
+def test_admin_puede_cambiar_categoria_complemento(cliente, app, usuario_prueba):
     """Comprueba que un administrador pueda alternar el estado es_complemento de una categoría.
-    Se verifica con el mensaje flash de la respuesta redirigida."""
+
+    Se verifica con el mensaje flash de la respuesta redirigida. Necesita el
+    fixture `usuario_prueba` porque el login exige que `admin_test@quero.pe`
+    exista en la tabla `personal`. Al final restaura el valor original para
+    que la prueba sea repetible y no deje la base cambiada.
+    """
     # Autenticar como admin
     login_resp = cliente.post("/auth/login", data={"correo": "admin_test@quero.pe", "password": "clave123"}, follow_redirects=True)
     assert login_resp.status_code == 200
@@ -85,13 +90,22 @@ def test_admin_puede_cambiar_categoria_complemento(cliente, app):
     with app.app_context():
         cat = consultar_uno("SELECT categoria_id, es_complemento FROM categoria LIMIT 1")
     cat_id = cat["categoria_id"]
+    valor_original = bool(cat["es_complemento"])
 
-    # Marcar como complemento (valor "1")
-    resp = cliente.post(f"/staff/carta/categoria/{cat_id}/complemento", data={"es_complemento": "1"}, follow_redirects=True)
-    assert resp.status_code == 200
-    assert "complemento sugerido" in resp.data.decode("utf-8").lower()
+    try:
+        # Marcar como complemento (valor "1")
+        resp = cliente.post(f"/staff/carta/categoria/{cat_id}/complemento", data={"es_complemento": "1"}, follow_redirects=True)
+        assert resp.status_code == 200
+        assert "complemento sugerido" in resp.data.decode("utf-8").lower()
 
-    # Desmarcar como complemento (valor "0")
-    resp2 = cliente.post(f"/staff/carta/categoria/{cat_id}/complemento", data={"es_complemento": "0"}, follow_redirects=True)
-    assert resp2.status_code == 200
-    assert "desmarcada" in resp2.data.decode("utf-8").lower()
+        # Desmarcar como complemento (valor "0")
+        resp2 = cliente.post(f"/staff/carta/categoria/{cat_id}/complemento", data={"es_complemento": "0"}, follow_redirects=True)
+        assert resp2.status_code == 200
+        assert "desmarcada" in resp2.data.decode("utf-8").lower()
+    finally:
+        with app.app_context():
+            ejecutar(
+                "UPDATE categoria SET es_complemento = %s WHERE categoria_id = %s",
+                (valor_original, cat_id),
+                commit=True,
+            )

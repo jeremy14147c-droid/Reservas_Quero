@@ -112,7 +112,10 @@ def test_inicio_muestra_identidad_y_datos_del_local(cliente, contacto_temporal):
     assert "Av. Inca Garcilaso de la Vega 54" in html
     assert "Reservar mesa" in html
     assert "Hacer pedido" in html
-    assert "Ver la carta" in html
+    # La Fase 3.5 quitó el acceso directo a la carta del inicio: el cliente
+    # elige los platos dentro de /pedir. La información del local sigue ahí.
+    assert "Cómo llegar" in html
+    assert "Horario" in html
 
 
 def test_boton_flotante_de_whatsapp_usa_el_numero_del_local(cliente, contacto_temporal):

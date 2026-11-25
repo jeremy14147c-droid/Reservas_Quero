@@ -39,6 +39,10 @@ def test_interruptor_disponibilidad_y_reflejo_en_carta(cliente, usuario_prueba, 
     # Iniciar sesión como empleado
     cliente.post("/auth/login", data={"correo": "admin_test@quero.pe", "password": "clave123"})
 
+    # La base puede tener otros platos agotados (datos reales del local), así que
+    # se compara la CANTIDAD de insignias "Agotado" antes y después del cambio.
+    agotados_antes = cliente.get("/carta").data.count(b"Agotado")
+
     # 1. Cambiar a disponible = False
     resp_api = cliente.post(f"/api/v1/platos/{plato_id}/disponible", json={"disponible": False})
     assert resp_api.status_code == 200
@@ -46,15 +50,15 @@ def test_interruptor_disponibilidad_y_reflejo_en_carta(cliente, usuario_prueba, 
     assert cuerpo["ok"] is True
     assert cuerpo["datos"]["disponible"] is False
 
-    # 2. En la carta pública debe salir como 'Agotado'
+    # 2. En la carta pública aparece UNA insignia más y el plato sigue visible
     resp_pub = cliente.get("/carta")
     assert b"Plato Test Alfa" in resp_pub.data
-    assert b"Agotado por hoy" in resp_pub.data
+    assert resp_pub.data.count(b"Agotado") == agotados_antes + 1
 
-    # 3. Volver a activar a True
+    # 3. Volver a activar a True: la insignia desaparece
     cliente.post(f"/api/v1/platos/{plato_id}/disponible", json={"disponible": True})
     resp_pub_act = cliente.get("/carta")
-    assert b"Agotado por hoy" not in resp_pub_act.data
+    assert resp_pub_act.data.count(b"Agotado") == agotados_antes
 
 
 def test_actualizar_precio_api(cliente, usuario_prueba, datos_prueba, app):
