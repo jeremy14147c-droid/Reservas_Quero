@@ -102,6 +102,33 @@ def create_app(config_class=Config):
     # Manejo uniforme de errores (JSON en /api/, HTML en el resto)
     registrar_manejadores_error(app)
 
+    # Bootstrap idempotente: si la base no tiene ningun admin, crear las
+    # cuentas por defecto publicadas en USUARIOS_Y_CLAVES.md. No sobrescribe
+    # las cuentas que el admin haya creado. Nunca rompe el arranque.
+    try:
+        with app.app_context():
+            from app.db import consultar_uno, ejecutar
+            hay_admin = consultar_uno("SELECT 1 FROM personal WHERE rol = 'admin' LIMIT 1")
+            if not hay_admin:
+                cuentas = [
+                    ("Admin Quero", "admin@quero.pe",
+                     "scrypt:32768:8:1$CUsd8EC3cYmDfv6y$a70eb1f40db259aa1ad52724eb3bef500729926529195e592d60b24de42b3578031e8af7a4cd772263bcb1d159e0ed60ccc0cdc3e0ba3d2286234a44bf686192",
+                     "admin"),
+                    ("Mozo 1", "mozo1@quero.pe",
+                     "scrypt:32768:8:1$fWPmtWXkWqcVAl5v$b35bb7e50ade669b707230cf5f7ea0359c4b0fee1709945550a2d78e7d92334c9c9b008700ed159b689fd7ff5fcd72b37369d08bd006cd6a82f30d847e33561d",
+                     "empleado"),
+                ]
+                for nombre, correo, hsh, rol in cuentas:
+                    ejecutar(
+                        "INSERT INTO personal (nombre, correo, password_hash, rol, activo, debe_cambiar_clave) "
+                        "SELECT %s, %s, %s, %s, TRUE, FALSE "
+                        "WHERE NOT EXISTS (SELECT 1 FROM personal WHERE lower(correo) = %s)",
+                        (nombre, correo, hsh, rol, correo.lower()),
+                        commit=True,
+                    )
+    except Exception:
+        pass
+
     return app
 
 
