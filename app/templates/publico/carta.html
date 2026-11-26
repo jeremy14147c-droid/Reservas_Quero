@@ -91,7 +91,7 @@
                                     <!-- Estado disponible / agotado -->
                                     <div class="plato-accion ms-2">
                                         {% if not plato.disponible %}
-                                            <span class="badge bg-danger badge-agotado">Agotado</span>
+                                            <span class="badge bg-danger badge-agotado">Agotado por hoy</span>
                                         {% else %}
                                             <a href="{{ url_for('publico.pedir') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 fw-semibold">
                                                 Pedir
