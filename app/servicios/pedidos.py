@@ -332,8 +332,29 @@ def obtener_pedido_detalle(pedido_id, dao=None, cliente_dao=None):
     return detalle
 
 
+def ordenar_pedidos_cocina_y_listos(pedidos):
+    """Regla PURA (Fase 3.6): Ordena pedidos de cocina y listos.
+    Primero los pedidos de tipo 'recojo' (para llevar) y luego los 'local',
+    cada grupo ordenado por preparacion_en (o creado_en si falta) y desempate por pedido_id.
+    """
+    if not pedidos:
+        return []
+
+    return sorted(
+        pedidos,
+        key=lambda p: (
+            0 if p.get("tipo") == "recojo" else 1,
+            p.get("preparacion_en") or p.get("creado_en"),
+            p.get("pedido_id") or 0
+        )
+    )
+
+
 def obtener_cola(dao=None):
-    """Datos de la cola del staff (4 columnas): pendientes, por cobrar, en cocina, listos."""
+    """Datos de la cola del staff (4 columnas): pendientes, por cobrar, en cocina, listos.
+    En cocina y listos van primero los de recojo (Fase 3.6).
+    En pendientes y por cobrar se mantiene el orden por llegada.
+    """
     dao = dao or pedido_dao_default
     filas = dao.listar_cola()
 
@@ -353,6 +374,11 @@ def obtener_cola(dao=None):
             cola["entregados"].append(fila)
         elif fila["estado"] == "aceptado":
             cola["por_cobrar"].append(fila)
+
+    # Fase 3.6: Recojo primero en 'en_cocina' y 'listos'
+    cola["en_cocina"] = ordenar_pedidos_cocina_y_listos(cola["en_cocina"])
+    cola["listos"] = ordenar_pedidos_cocina_y_listos(cola["listos"])
+
     return cola
 
 
@@ -377,7 +403,7 @@ def obtener_cocina(dao=None, config_dao=None):
         fila["minutos"] = minutos
         fila["atrasado"] = inicio is not None and minutos >= config["umbral_preparacion_min"]
         cocina.append(fila)
-    return cocina
+    return ordenar_pedidos_cocina_y_listos(cocina)
 
 
 def obtener_pedido_publico(token, dao=None, config_dao=None):

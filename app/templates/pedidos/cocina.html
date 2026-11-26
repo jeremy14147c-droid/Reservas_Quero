@@ -17,9 +17,24 @@
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
         <h2 class="fw-bold mb-0"><i class="bi bi-fire text-danger me-2"></i>Cocina</h2>
-        <p class="text-muted small mb-0">Pedidos en preparación por orden de entrada. Rojo al superar {{ umbral_min }} min.</p>
+        <p class="text-muted small mb-0">Pedidos en preparación por orden de entrada (recojo primero). Rojo al superar {{ umbral_min }} min.</p>
     </div>
     <button id="btn-sonido" class="btn btn-outline-secondary btn-sm"><i class="bi bi-volume-mute me-1"></i> Activar sonido</button>
+</div>
+
+<!-- Casilla de impresión automática de pedidos nuevos (Fase 3.6; apagada por defecto) -->
+<div class="card border-0 bg-light p-2 mb-3">
+    <div class="form-check form-switch mb-1">
+        <input class="form-check-input" type="checkbox" id="imprimir-auto-cocina">
+        <label class="form-check-label fw-semibold" for="imprimir-auto-cocina">
+            Imprimir automáticamente los pedidos nuevos de esta pantalla
+        </label>
+    </div>
+    <div class="small text-danger">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+        Activa la impresión automática en un solo equipo (cocina o caja) para no imprimir duplicados.
+        <span class="text-muted">(requiere la tiquetera configurada con --kiosk-printing; ver GUIA_IMPRESION.md)</span>
+    </div>
 </div>
 
 <!-- Los pedidos listos (por si el navegador duerme) -->
@@ -32,16 +47,22 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/impresion_pedidos.js') }}"></script>
 <script>
 /* Tablero de cocina: GET /api/v1/pedidos/cocina cada 10 s.
    - Temporizador visual desde preparacion_en (se recalcula cada segundo).
    - Rojo (solo visual) cuando pasa el umbral.
-   - Screen Wake Lock: pide que la pantalla no se apague (si el navegador lo permite). */
+   - Screen Wake Lock: pide que la pantalla no se apague (si el navegador lo permite).
+   - Impresión automática con memoria en sessionStorage (Fase 3.6). */
 const CSRF_K = document.querySelector('meta[name="csrf-token"]').content;
 const UMBRAL_MIN = {{ umbral_min }};
 let wakeLock = null;
 let sonarCocina = false;
 let ctxAudio = null;
+
+const manejadorImpresionCocina = typeof configurarImpresionAutomatica === 'function'
+    ? configurarImpresionAutomatica('imprimir-auto-cocina', 'imprimir_auto_cocina', 'pedidos_impresos_cocina')
+    : null;
 
 document.getElementById('btn-sonido').addEventListener('click', function () {
     sonarCocina = !sonarCocina;
@@ -74,18 +95,34 @@ async function apiKocina() {
 }
 
 let pedidosActuales = [];
+let idsPreviosCocina = null;
+
+function verificarImpresionNuevos(pedidos) {
+    const ids = pedidos.map(p => p.pedido_id);
+    if (idsPreviosCocina === null) {
+        idsPreviosCocina = ids;
+        return;
+    }
+    const nuevos = ids.filter(id => !idsPreviosCocina.includes(id));
+    if (nuevos.length && manejadorImpresionCocina) {
+        manejadorImpresionCocina.imprimirNuevos(nuevos);
+    }
+    idsPreviosCocina = ids;
+}
 
 function pintarCocina(datos) {
     pedidosActuales = datos.pedidos || [];
     const cont = document.getElementById('tarjetas-cocina');
     document.getElementById('sin-cocina').style.display = pedidosActuales.length ? 'none' : 'block';
 
+    verificarImpresionNuevos(pedidosActuales);
+
     cont.innerHTML = pedidosActuales.map(p => {
         const lineaLista = (p.lineas || []).map(l =>
             `<div class="linea-kitchen"><strong>${l.cantidad}</strong> × ${l.nombre}
                 ${l.nota ? '<span class="text-muted small">(' + l.nota + ')</span>' : ''}</div>`).join('');
-        const tipoMarca = p.tipo === 'recojo' ? '<span class="badge bg-warning text-dark">Recojo</span>'
-                                              : '<span class="badge bg-primary">Local</span>';
+        const tipoMarca = p.tipo === 'recojo' ? '<span class="badge bg-warning text-dark fw-bold">PARA LLEVAR</span>'
+                                              : '<span class="badge bg-primary fw-bold">LOCAL</span>';
         return `
         <div class="col-12 col-md-6 col-xl-4">
             <div class="card mb-2 card-cocina ${p.atrasado ? 'card-atrasada' : ''} shadow-sm">
@@ -101,9 +138,14 @@ function pintarCocina(datos) {
                         </div>
                     </div>
                     <div class="mt-2">${lineaLista}</div>
-                    <button class="btn btn-success w-100 mt-3" onclick="marcarListoK(${p.pedido_id})">
-                        <i class="bi bi-check2"></i> LISTO
-                    </button>
+                    <div class="d-flex gap-2 mt-3">
+                        <a href="/staff/pedido/${p.pedido_id}/ticket" target="_blank" class="btn btn-outline-secondary btn-sm flex-fill">
+                            <i class="bi bi-printer me-1"></i> Imprimir ticket
+                        </a>
+                        <button class="btn btn-success btn-sm flex-fill fw-bold" onclick="marcarListoK(${p.pedido_id})">
+                            <i class="bi bi-check2"></i> LISTO
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>`;

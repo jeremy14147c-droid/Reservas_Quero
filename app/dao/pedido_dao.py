@@ -164,7 +164,7 @@ class PedidoDAO:
             LEFT JOIN plato pl ON pl.plato_id = d.plato_id
             WHERE p.estado = 'en_preparacion'
             GROUP BY p.pedido_id, r.total, r.cobrado, c.nombre
-            ORDER BY p.preparacion_en, p.pedido_id
+            ORDER BY CASE WHEN p.tipo = 'recojo' THEN 0 ELSE 1 END, p.preparacion_en, p.pedido_id
             """
         )
 

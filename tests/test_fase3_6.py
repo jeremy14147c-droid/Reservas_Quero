@@ -10,7 +10,14 @@ def test_orden_cola_y_cocina_con_pedidos_mezclados(cliente, app, usuario_prueba)
     cliente.post("/auth/login", data={"correo": "admin_test@quero.pe", "password": "clave123"})
 
     ids_creados = []
+    cliente_temp_id = None
     with app.app_context():
+        # Cliente para el pedido de recojo (exigido por ck_pedido_cliente)
+        c_fila = ejecutar_retornando(
+            "INSERT INTO cliente (nombre, telefono, acepta_datos) VALUES ('Cliente Recojo Test', '999888777', TRUE) RETURNING cliente_id"
+        )
+        cliente_temp_id = c_fila["cliente_id"]
+
         # Obtener un plato para las líneas
         plato = consultar_uno("SELECT plato_id, precio FROM plato WHERE disponible = TRUE AND activo = TRUE LIMIT 1")
         pid = plato["plato_id"]
@@ -39,10 +46,11 @@ def test_orden_cola_y_cocina_con_pedidos_mezclados(cliente, app, usuario_prueba)
         # Pedido Recojo (hace 1 minuto - más reciente)
         p_rec = ejecutar_retornando(
             """
-            INSERT INTO pedido (tipo, canal, estado, preparacion_en, nota)
-            VALUES ('recojo', 'web', 'en_preparacion', now() - interval '1 minute', 'Para llevar urgente')
+            INSERT INTO pedido (cliente_id, tipo, canal, estado, preparacion_en, nota)
+            VALUES (%s, 'recojo', 'web', 'en_preparacion', now() - interval '1 minute', 'Para llevar urgente')
             RETURNING pedido_id
-            """
+            """,
+            (cliente_temp_id,)
         )
         ids_creados.append(p_rec["pedido_id"])
 
@@ -76,6 +84,8 @@ def test_orden_cola_y_cocina_con_pedidos_mezclados(cliente, app, usuario_prueba)
             for p_id in ids_creados:
                 ejecutar("DELETE FROM detalle_pedido WHERE pedido_id = %s", (p_id,))
                 ejecutar("DELETE FROM pedido WHERE pedido_id = %s", (p_id,), commit=True)
+            if cliente_temp_id:
+                ejecutar("DELETE FROM cliente WHERE cliente_id = %s", (cliente_temp_id,), commit=True)
 
 
 def test_ticket_imprimible_responde_para_pedido_en_cocina(cliente, app, usuario_prueba):

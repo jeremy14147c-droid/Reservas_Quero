@@ -18,6 +18,7 @@ def cola():
     return render_template("pedidos/cola.html")
 
 
+@pedidos_bp.route("/cocina")
 @pedidos_bp.route("/pedidos/cocina")
 @requiere_rol("admin", "empleado")
 def cocina():

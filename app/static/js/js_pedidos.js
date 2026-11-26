@@ -20,6 +20,7 @@ let datosCola = null;
 let idsPendPrev = null;
 let sonidoQ = false;
 let contextoAudioQ = null;
+let manejadorImpresionCola = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-sonido').addEventListener('click', function () {
@@ -34,12 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
         this.classList.toggle('btn-outline-secondary', !sonidoQ);
     });
 
-    /* Casilla "Imprimir al pasar a cocina" (apagada por defecto; recuerda su elección) */
-    const casilla = document.getElementById('imprimir-auto');
-    casilla.checked = localStorage.getItem('imprimir_al_cocinar') === 'si';
-    casilla.addEventListener('change', () => {
-        localStorage.setItem('imprimir_al_cocinar', casilla.checked ? 'si' : 'no');
-    });
+    /* Casilla "Imprimir al pasar a cocina" (Fase 3.6: usa helper compartido con sessionStorage) */
+    manejadorImpresionCola = typeof configurarImpresionAutomatica === 'function'
+        ? configurarImpresionAutomatica('imprimir-auto', 'imprimir_al_cocinar', 'pedidos_impresos_cola')
+        : null;
 
     refrescarCola();
     setInterval(refrescarCola, 10000);
@@ -108,8 +107,8 @@ function pintarColumna(nombreLista, idCol, idConteo, esPendiente) {
 
 function tarjetaPedido(p, esPendiente) {
     const tipoMarca = p.tipo === 'recojo'
-        ? '<span class="badge bg-warning text-dark">Recojo web</span>'
-        : '<span class="badge bg-primary">Local</span>';
+        ? '<span class="badge bg-warning text-dark fw-bold">PARA LLEVAR</span>'
+        : '<span class="badge bg-primary fw-bold">LOCAL</span>';
     const cliente = p.cliente_nombre
         ? `<strong>${esc(p.cliente_nombre)}</strong><div class="small"><i class="bi bi-telephone"></i> ${esc(p.cliente_telefono || '')}</div>`
         : (p.tipo === 'local' && p.mesa_referencia
@@ -240,13 +239,18 @@ function detectarPendientesNuevos() {
 /* ------------------------- impresión al pasar a cocina (nivel 2) ------------------------- */
 let idsCocinaPrev = null;
 function detectarNuevosEnCocina() {
-    const casilla = document.getElementById('imprimir-auto');
     const ids = (datosCola.en_cocina || []).map(p => p.pedido_id);
     if (idsCocinaPrev === null) { idsCocinaPrev = ids; return; }
     const nuevos = ids.filter(id => !idsCocinaPrev.includes(id));
-    if (nuevos.length && casilla && casilla.checked) {
-        // abre el ticket de CADA pedido nuevo; con ?auto=1 el ticket imprime al cargar
-        nuevos.forEach(id => window.open('/staff/pedido/' + id + '/ticket?auto=1', '_blank'));
+    if (nuevos.length) {
+        if (manejadorImpresionCola) {
+            manejadorImpresionCola.imprimirNuevos(nuevos);
+        } else {
+            const casilla = document.getElementById('imprimir-auto');
+            if (casilla && casilla.checked) {
+                nuevos.forEach(id => window.open('/staff/pedido/' + id + '/ticket?auto=1', '_blank'));
+            }
+        }
     }
     idsCocinaPrev = ids;
 }
