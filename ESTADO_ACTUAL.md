@@ -1,10 +1,10 @@
-# ESTADO ACTUAL – léelo primero (actualizado el 24/11/2026)
+# ESTADO ACTUAL – léelo primero (actualizado el 26/11/2026)
 
 Archivo para el equipo y el agente. Si algo contradice a otro documento del repo, manda este archivo y luego `AGENTS.md`.
 
 ## 1. Dónde estamos
-- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), **Fases S1 + S2 de Seguridad (Semana 14)** (sesión revocable, fuerza bruta, redirect seguro, cabeceras, UUID), **Fase 3.R (Capa DAO y desacoplamiento)** (100% del SQL en `app/dao/`), **Fase 3.3 (Horas pasadas y vencimiento automático)**, **Fase 3.4 (Identidad visual del cliente)** y **Fase 3.5 (Carta y pedido en celular)**: chips de categorías con scroll lateral, acordeón por categoría, buscador por nombre o número, tarjetas con +/− y espacio reservado para imagen, barra inferior "Ver pedido", panel (offcanvas) con el carrito guardado en `sessionStorage`, bloque "Complementa tu pedido" (`categoria.es_complemento`, migración `005`), carta pública en acordeón y casilla en Carta Staff. **110 pruebas en verde**.
-- Siguiente paso: **Fase 3.6** (Cocina: imprimir y recojo primero). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
+- Hechas: Fases 0, 1, 1.1, 2, 3, **3.1** (buscador y mesa), **3.2** (tiempo en mesa por grupo), **3.0** (higiene Git), **Despliegue D** (Neon y Render en vivo), **Fases S1 + S2 de Seguridad (Semana 14)** (sesión revocable, fuerza bruta, redirect seguro, cabeceras, UUID), **Fase 3.R (Capa DAO y desacoplamiento)** (100% del SQL en `app/dao/`), **Fase 3.3 (Horas pasadas y vencimiento automático)**, **Fase 3.4 (Identidad visual del cliente)**, **Fase 3.5 (Carta y pedido en celular)** y **Fase 3.6 (Cocina: imprimir y recojo primero)**: pedidos de recojo primero en 'en cocina' y 'listos' (DAO y servicio), etiquetas visibles 'PARA LLEVAR' y 'LOCAL', botón 'Imprimir ticket' en tarjetas de cocina, casilla de autoimpresión con advertencia y memoria en `sessionStorage` para evitar duplicados. **116 pruebas en verde**.
+- Siguiente paso: **Fase 3.7** (Pago con comprobante). El detalle y los prompts están en `PROMPTS_POR_FASE.md`.
 
 ## 2. Problemas detectados (verificados)
 1. [RESUELTO en 3.0] `.venv/` ya no está versionado en Git (se eliminó del índice con `git rm -r --cached .venv`). `.env` no está en el historial (revisado).
@@ -35,8 +35,8 @@ Archivo para el equipo y el agente. Si algo contradice a otro documento del repo
 | 3.3 | Horas pasadas no reservables y vencimiento automático | 3.R | Completado (75 tests en verde) |
 | 3.4 | Identidad visual del cliente | 3.3 | Completado (101 tests en verde) |
 | 3.5 | Carta y pedido en celular (categorías, desplegables, carrito) | 3.4 | Completado (110 tests en verde) |
-| 3.6 | Cocina: imprimir y recojo primero | 3.5 | Siguiente |
-| 3.7 | Pago con comprobante | 3.6 | Pendiente |
+| 3.6 | Cocina: imprimir y recojo primero | 3.5 | Completado (116 tests en verde) |
+| 3.7 | Pago con comprobante | 3.6 | Siguiente |
 | 3.8 | WhatsApp sin costo (mensajes y botones) | 3.7 | Pendiente |
 | 3.9 | Imágenes de platos (opcional) | 3.7 | Pendiente |
 
